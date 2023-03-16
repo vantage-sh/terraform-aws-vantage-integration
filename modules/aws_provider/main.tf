@@ -123,8 +123,12 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
 resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
   count         = var.cur_bucket_name != "" ? 1 : 0
   bucket        = var.cur_bucket_name
-  acl           = "private"
   force_destroy = true
+}
+
+resource "aws_s3_bucket_acl" "vantage_cost_and_usage_reports" {
+  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  acl    = "private"
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports" {
