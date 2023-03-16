@@ -1,4 +1,5 @@
 variable "cur_bucket_name" {
-  type = string
+  type    = string
+  default = ""
 }
 
