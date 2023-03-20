@@ -4,7 +4,7 @@ This module handles linking an AWS account with your Vantage account. For root A
 
 ## Usage
 
-The base module configures an AWS Account integration on Vantage using the [aws_provider submodule](modules/aws_provider). The submodule itself can be used if additional configuration is required. By default, it does not configure a CUR integration. If the account is your root AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable to provision that. The bucket name is used for a private S3 bucket and must be globally unique.
+This module configures an AWS Account integration on Vantage. By default, it does not configure a CUR integration. If the account is your root AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable to provision that. The bucket name is used for a private S3 bucket and must be globally unique.
 
 The below example assumes you'll use the [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) feature of the AWS provider to access the desired AWS account.
 
@@ -16,7 +16,7 @@ provider "aws" {
   }
 }
 
-module "integrations" {
-  source = "vantage-sh/aws/integrations"
+module "vantage-integration" {
+  source  = "vantage-sh/vantage-integration/aws"
 }
 ```
