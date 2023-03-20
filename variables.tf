@@ -7,3 +7,8 @@ variable "vantage_sns_topic_arn" {
   type    = string
   default = "arn:aws:sns:us-east-1:630399649041:cost-and-usage-report-uploaded"
 }
+
+variable "cur_report_name" {
+  type    = string
+  default = "VantageReport"
+}
