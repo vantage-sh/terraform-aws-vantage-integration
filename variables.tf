@@ -1,14 +1,17 @@
 variable "cur_bucket_name" {
-  type    = string
-  default = ""
+  type        = string
+  description = "The S3 bucket name to provision for CUR integration. This module assumes the bucket does not already exist and will setup the bucket, CUR integration with the bucket, and access for the cross account role."
+  default     = ""
 }
 
 variable "vantage_sns_topic_arn" {
-  type    = string
-  default = "arn:aws:sns:us-east-1:630399649041:cost-and-usage-report-uploaded"
+  type        = string
+  description = "SNS Topic used to notify of bucket events, such as CUR files being updated. Default is the production SNS topic used by Vantage and should not be changed except for module development."
+  default     = "arn:aws:sns:us-east-1:630399649041:cost-and-usage-report-uploaded"
 }
 
 variable "cur_report_name" {
-  type    = string
-  default = "VantageReport"
+  type        = string
+  description = "Report name for the CUR report definition."
+  default     = "VantageReport"
 }
