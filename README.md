@@ -1,6 +1,6 @@
 # terraform-vantage-integrations
 
-This module handles linking an AWS account with your Vantage account. For root AWS accounts, you will want to provision a CUR bucket via the `cur_bucket_name` variable. For subaccount you will want to link access but won't need to configure the CUR bucket.
+This module handles linking an AWS account with your Vantage account. For root AWS accounts, you will want to provision a CUR bucket via the `cur_bucket_name` variable. For subaccounts you will want to link access but won't need to configure the CUR bucket.
 
 ## Usage
 This module configures an AWS Account integration on Vantage. By default, it does not configure a CUR integration. If the account is your root AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable to provision that. The bucket name is used for a private S3 bucket and must be globally unique.
@@ -8,7 +8,7 @@ This module configures an AWS Account integration on Vantage. By default, it doe
 The below examples assumes you'll use the [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) feature of the AWS provider to access the desired AWS account.
 
 ### Management AWS Account with Cost and Usage Reports (CUR) Integration
-This is an example for creating a management (root) AWS account integration where CUR and an S3 bucket are provisioned in addition to the cross account IAM role.
+This is an example for creating a management (root) AWS account integration where CUR and an S3 bucket are provisioned in addition to the cross account IAM role. Creating the CUR bucket in your root account is _highly recommended_.
 
 ```hcl
 provider "aws" {
