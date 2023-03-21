@@ -42,3 +42,11 @@ module "vantage-integration" {
   source  = "vantage-sh/vantage-integration/aws"
 }
 ```
+
+## Release
+
+To release a new module version tag a version (using semver) and push.
+```bash
+$ git tag v99.99.99
+$ git push origin v99.99.99
+```
