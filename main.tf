@@ -89,17 +89,15 @@ resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
   }
 }
 
-resource "aws_iam_policy_attachment" "vantage_cross_account_connection_with_bucket" {
+resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with_bucket" {
   count      = var.cur_bucket_name != "" ? 1 : 0
-  name       = "vantage_cross_account_connection-view-only"
-  roles      = [aws_iam_role.vantage_cross_account_connection_with_bucket[0].name]
+  role       = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
-resource "aws_iam_policy_attachment" "vantage_cross_account_connection_without_bucket" {
+resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_without_bucket" {
   count      = var.cur_bucket_name != "" ? 0 : 1
-  name       = "vantage_cross_account_connection-view-only"
-  roles      = [aws_iam_role.vantage_cross_account_connection_without_bucket[0].name]
+  role       = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
