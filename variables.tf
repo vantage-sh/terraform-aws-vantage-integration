@@ -15,3 +15,9 @@ variable "cur_report_name" {
   description = "Report name for the CUR report definition."
   default     = "VantageReport"
 }
+
+variable "compatibility_private_bucket_acl" {
+  type        = bool
+  description = "For backwards compatibility, users can set this variable to true so a 'private' bucket ACL is applied. This is not necessary for new buckets being created. If you're unsure, leave this as false."
+  default     = false
+}
