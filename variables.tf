@@ -21,3 +21,9 @@ variable "compatibility_private_bucket_acl" {
   description = "For backwards compatibility, users can set this variable to true so a 'private' bucket ACL is applied. This is not necessary for new buckets being created. If you're unsure, leave this as false."
   default     = false
 }
+
+variable "enable_autopilot" {
+  type        = bool
+  description = "Enable Vantage Autopilot. This will create more permissions for the cross account role."
+  default     = true
+}

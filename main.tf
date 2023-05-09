@@ -47,9 +47,12 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
     policy = data.vantage_aws_provider_info.default.root_policy
   }
 
-  inline_policy {
-    name   = "VantageAutoPilot"
-    policy = data.vantage_aws_provider_info.default.autopilot_policy
+  dynamic "inline_policy" {
+    for_each = var.enable_autopilot ? [1] : []
+    content {
+      name   = "VantageAutoPilot"
+      policy = data.vantage_aws_provider_info.default.autopilot_policy
+    }
   }
 
   inline_policy {
