@@ -27,3 +27,21 @@ variable "enable_autopilot" {
   description = "Enable Vantage Autopilot. This will create more permissions for the cross account role."
   default     = true
 }
+
+variable "vantage_root_iam_policy_override" {
+  type        = string
+  description = "AWS IAM Policy to override the Vantage Root IAM policy."
+  default     = null
+}
+
+variable "vantage_cloudwatch_metrics_iam_policy_override" {
+  type        = string
+  description = "AWS IAM Policy to override the Vantage Cloudwatch Metrics IAM policy."
+  default     = null
+}
+
+variable "vantage_additional_resources_iam_policy_override" {
+  type        = string
+  description = "AWS IAM Policy to override the Vantage Additional ResourcesIAM policy."
+  default     = null
+}

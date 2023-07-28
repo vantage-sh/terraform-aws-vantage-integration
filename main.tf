@@ -44,7 +44,7 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
 
   inline_policy {
     name   = "root"
-    policy = data.vantage_aws_provider_info.default.root_policy
+    policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
   }
 
   dynamic "inline_policy" {
@@ -57,12 +57,12 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
 
   inline_policy {
     name   = "VantageCloudWatchMetricsReadOnly"
-    policy = data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
+    policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
   }
 
   inline_policy {
     name   = "VantageAdditionalResourceReadOnly"
-    policy = data.vantage_aws_provider_info.default.additional_resources_policy
+    policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
   }
 }
 
@@ -73,22 +73,25 @@ resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
 
   inline_policy {
     name   = "root"
-    policy = data.vantage_aws_provider_info.default.root_policy
+    policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
   }
 
-  inline_policy {
-    name   = "VantageAutoPilot"
-    policy = data.vantage_aws_provider_info.default.autopilot_policy
+  dynamic "inline_policy" {
+    for_each = var.enable_autopilot ? [1] : []
+    content {
+      name   = "VantageAutoPilot"
+      policy = data.vantage_aws_provider_info.default.autopilot_policy
+    }
   }
 
   inline_policy {
     name   = "VantageCloudWatchMetricsReadOnly"
-    policy = data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
+    policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
   }
 
   inline_policy {
     name   = "VantageAdditionalResourceReadOnly"
-    policy = data.vantage_aws_provider_info.default.additional_resources_policy
+    policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
   }
 }
 
