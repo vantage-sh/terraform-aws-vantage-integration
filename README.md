@@ -11,6 +11,24 @@ The below examples assumes you'll use the [assume_role](https://registry.terrafo
 This is an example for creating a management (root) AWS account integration where CUR and an S3 bucket are provisioned in addition to the cross account IAM role. Creating the CUR bucket in your root account is _highly recommended_.
 
 ```hcl
+terraform {
+  required_version = "~> 1.0"
+
+  required_providers {
+    vantage = {
+      source = "vantage-sh/vantage"
+      version = "0.0.2"
+    }
+  }
+}
+
+provider "vantage" {
+
+  # A Vantage API Token is needed to use this module, it is recommended to either use env var VANTAGE_API_TOKEN
+  # or to use a tfvars file that's not committed to the repository.
+  api_token = YOUR_API_TOKEN
+}
+
 provider "aws" {
   region = "us-east-1"
   assume_role {
