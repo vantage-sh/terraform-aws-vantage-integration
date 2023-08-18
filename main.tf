@@ -64,6 +64,14 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
     name   = "VantageAdditionalResourceReadOnly"
     policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
   }
+
+  dynamic "inline_policy" {
+    for_each = var.additional_inline_policies
+    content {
+      name   = inline_policy.value["name"]
+      policy = inline_policy.value["policy"]
+    }
+  }
 }
 
 resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
@@ -92,6 +100,14 @@ resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
   inline_policy {
     name   = "VantageAdditionalResourceReadOnly"
     policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
+  }
+
+  dynamic "inline_policy" {
+    for_each = var.additional_inline_policies
+    content {
+      name   = inline_policy.value["name"]
+      policy = inline_policy.value["policy"]
+    }
   }
 }
 

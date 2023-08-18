@@ -45,3 +45,9 @@ variable "vantage_additional_resources_iam_policy_override" {
   description = "AWS IAM Policy to override the Vantage Additional ResourcesIAM policy."
   default     = null
 }
+
+variable "additional_inline_policies" {
+  type        = set(map(string))
+  description = "Additonal IAM Policies to include on the cross account role."
+  default     = []
+}
