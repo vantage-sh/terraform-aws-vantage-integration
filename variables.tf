@@ -51,3 +51,9 @@ variable "additional_inline_policies" {
   description = "Additonal IAM Policies to include on the cross account role."
   default     = []
 }
+
+variable "tags" {
+  description = "A map of tags to add to all supported resources managed by the module."
+  type        = map(string)
+  default     = {}
+}

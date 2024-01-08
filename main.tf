@@ -72,6 +72,8 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
       policy = inline_policy.value["policy"]
     }
   }
+
+  tags = var.tags
 }
 
 resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
@@ -109,6 +111,8 @@ resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
       policy = inline_policy.value["policy"]
     }
   }
+
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with_bucket" {
@@ -144,6 +148,8 @@ resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
   count         = var.cur_bucket_name != "" ? 1 : 0
   bucket        = var.cur_bucket_name
   force_destroy = true
+
+  tags          = var.tags
 }
 
 resource "aws_s3_bucket_acl" "vantage_cost_and_usage_reports" {
