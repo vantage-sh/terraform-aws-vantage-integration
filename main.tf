@@ -133,7 +133,7 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
   time_unit                  = "DAILY"
   format                     = "textORcsv"
   compression                = "GZIP"
-  additional_schema_elements = ["RESOURCES"]
+  additional_schema_elements = var.cur_report_additional_schema_elements
   s3_bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
   s3_region                  = "us-east-1"
   s3_prefix                  = "daily-v1"

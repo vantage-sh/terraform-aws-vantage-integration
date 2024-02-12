@@ -57,3 +57,10 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cur_report_additional_schema_elements" {
+  description = "A list of additional schema elements for the cur report. Only used if a cur bucket is specified."
+  type        = list(string)
+  default     = ["RESOURCES"]
+}
+
