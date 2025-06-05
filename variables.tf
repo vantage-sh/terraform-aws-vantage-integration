@@ -4,6 +4,17 @@ variable "cur_bucket_name" {
   default     = ""
 }
 
+variable "cur_report_time_unit" {
+  description = "The granularity of the cost and usage report: HOURLY or DAILY."
+  type        = string
+  default     = "DAILY"
+
+  validation {
+    condition     = contains(["HOURLY", "DAILY"], var.cur_report_time_unit)
+    error_message = "cur_report_time_unit must be either 'HOURLY' or 'DAILY'."
+  }
+}
+
 variable "vantage_sns_topic_arn" {
   type        = string
   description = "SNS Topic used to notify of bucket events, such as CUR files being updated. Default is the production SNS topic used by Vantage and should not be changed except for module development."

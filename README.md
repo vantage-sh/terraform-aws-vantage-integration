@@ -23,7 +23,9 @@ module "vantage-integration" {
 
   # Bucket names must be globally unique. It is provisioned with private acl's
   # and only accessed by Vantage via the provisioned cross account role.
-  cur_bucket_name = "my-company-cur-vantage"
+  cur_bucket_name        = "my-company-cur-vantage"
+  # Optional: granularity of the CUR report: "HOURLY" or "DAILY"
+  cur_report_time_unit   = "HOURLY"
 }
 ```
 

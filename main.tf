@@ -130,13 +130,13 @@ resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with
 resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
   count                      = var.cur_bucket_name != "" ? 1 : 0
   report_name                = var.cur_report_name
-  time_unit                  = "DAILY"
+  time_unit                  = var.cur_report_time_unit
   format                     = "textORcsv"
   compression                = "GZIP"
   additional_schema_elements = var.cur_report_additional_schema_elements
   s3_bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
   s3_region                  = "us-east-1"
-  s3_prefix                  = "daily-v1"
+  s3_prefix                  = "${lower(var.cur_report_time_unit)}-v1"
   report_versioning          = "OVERWRITE_REPORT"
   refresh_closed_reports     = true
   depends_on = [
@@ -149,7 +149,7 @@ resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
   bucket        = var.cur_bucket_name
   force_destroy = true
 
-  tags          = var.tags
+  tags = var.tags
 }
 
 resource "aws_s3_bucket_acl" "vantage_cost_and_usage_reports" {
