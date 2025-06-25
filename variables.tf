@@ -4,6 +4,18 @@ variable "cur_bucket_name" {
   default     = ""
 }
 
+variable "cur_bucket_lifecycle_enabled" {
+  type        = bool
+  description = "Enable lifecycle configuration for the CUR bucket."
+  default     = true
+}
+
+variable "cur_bucket_lifecycle_days" {
+  type        = number
+  description = "Number of days to retain CUR reports in the bucket."
+  default     = 200
+}
+
 variable "cur_report_time_unit" {
   description = "The granularity of the cost and usage report: HOURLY or DAILY."
   type        = string
@@ -74,4 +86,3 @@ variable "cur_report_additional_schema_elements" {
   type        = list(string)
   default     = ["RESOURCES"]
 }
-

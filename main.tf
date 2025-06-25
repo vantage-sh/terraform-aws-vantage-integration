@@ -159,14 +159,14 @@ resource "aws_s3_bucket_acl" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports" {
-  count  = var.cur_bucket_name != "" ? 1 : 0
+  count  = var.cur_bucket_name != "" && var.cur_bucket_lifecycle_enabled ? 1 : 0
   bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
 
   rule {
     id = "remove-old-reports"
 
     expiration {
-      days = 200
+      days = var.cur_bucket_lifecycle_days
     }
 
     status = "Enabled"
