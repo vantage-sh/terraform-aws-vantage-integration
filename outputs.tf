@@ -10,7 +10,7 @@ output "vantage_cost_and_usage_report_arn" {
 
 output "vantage_cost_and_usage_report_name" {
   description = "The Vantage CUR name"
-  value       = try(aws_cur_report_definition.vantage_cost_and_usage_reports.report_name, "")
+  value       = try(aws_cur_report_definition.vantage_cost_and_usage_reports.report_name, null)
 }
 
 output "vantage_cost_and_usage_reports_bucket_arn" {
