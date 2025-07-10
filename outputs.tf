@@ -20,5 +20,5 @@ output "vantage_cost_and_usage_reports_bucket_arn" {
 
 output "vantage_cost_and_usage_reports_bucket_id" {
   description = "The Vantage CUR bucket ID"
-  value       = try(aws_s3_bucket.vantage_cost_and_usage_reports.id, "")
+  value       = try(aws_s3_bucket.vantage_cost_and_usage_reports.id, null)
 }
