@@ -34,8 +34,9 @@ data "aws_iam_policy_document" "vantage_assume_role" {
 resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
   count = var.cur_bucket_name != "" ? 1 : 0
 
-  name               = "vantage_cross_account_connection"
-  assume_role_policy = data.aws_iam_policy_document.vantage_assume_role.json
+  name                 = "vantage_cross_account_connection"
+  assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
+  permissions_boundary = var.permissions_boundary_arn
 
   inline_policy {
     name   = "VantageCostandUsageReportRetrieval"
@@ -77,9 +78,10 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
 }
 
 resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
-  count              = var.cur_bucket_name != "" ? 0 : 1
-  name               = "vantage_cross_account_connection"
-  assume_role_policy = data.aws_iam_policy_document.vantage_assume_role.json
+  count                = var.cur_bucket_name != "" ? 0 : 1
+  name                 = "vantage_cross_account_connection"
+  assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
+  permissions_boundary = var.permissions_boundary_arn
 
   inline_policy {
     name   = "root"
