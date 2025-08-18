@@ -86,3 +86,14 @@ variable "cur_report_additional_schema_elements" {
   type        = list(string)
   default     = ["RESOURCES"]
 }
+
+variable "permissions_boundary_arn" {
+  type        = string
+  default     = null
+  description = "The ARN of the IAM policy to use as the permissions boundary for the IAM role. If not set, no permissions boundary will be applied."
+
+  validation {
+    condition     = var.permissions_boundary_arn == null || can(regex("^arn:aws(-[a-z]+)?:iam::\\d{12}:policy/.+", var.permissions_boundary_arn))
+    error_message = "If set, permissions_boundary_arn must be a valid IAM policy ARN."
+  }
+}
