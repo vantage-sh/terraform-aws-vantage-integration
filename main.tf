@@ -174,6 +174,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports
   rule {
     id = "remove-old-reports"
 
+    filter {}
+
     expiration {
       days = var.cur_bucket_lifecycle_days
     }
