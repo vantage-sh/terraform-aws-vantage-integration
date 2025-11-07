@@ -12,6 +12,12 @@ terraform {
   required_version = ">= 1.0.0"
 }
 
+data "aws_caller_identity" "current" {}
+
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
 data "vantage_aws_provider_info" "default" {
 }
 
@@ -241,6 +247,18 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     resources = [
       aws_s3_bucket.vantage_cost_and_usage_reports[0].arn
     ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
+    }
   }
 
   statement {
@@ -257,6 +275,18 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     resources = [
       "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
     ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
+    }
   }
 
   statement {
