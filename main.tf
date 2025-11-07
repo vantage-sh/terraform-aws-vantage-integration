@@ -233,57 +233,38 @@ data "aws_iam_policy_document" "vantage_cur_access" {
   count = var.cur_bucket_name != "" ? 1 : 0
 
   statement {
+    sid = "EnableAWSDataExportsToWriteToS3AndCheckPolicy"
+
     effect = "Allow"
 
     actions = [
-      "s3:GetBucketAcl",
+      "s3:PutObject",
       "s3:GetBucketPolicy"
     ]
     principals {
-      type        = "Service"
-      identifiers = ["billingreports.amazonaws.com"]
+      type = "Service"
+      identifiers = [
+        "billingreports.amazonaws.com",
+        "bcm-data-exports.amazonaws.com"
+      ]
     }
 
     resources = [
-      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn
-    ]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceArn"
-      values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [local.account_id]
-    }
-  }
-
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "s3:PutObject"
-    ]
-    principals {
-      type        = "Service"
-      identifiers = ["billingreports.amazonaws.com"]
-    }
-
-    resources = [
+      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
       "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
     ]
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "aws:SourceArn"
-      values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
+      values = [
+        "arn:aws:cur:us-east-1:${local.account_id}:definition/*",
+        "arn:aws:bcm-data-exports:us-east-1::export/*"
+      ]
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "aws:SourceAccount"
       values   = [local.account_id]
     }
