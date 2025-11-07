@@ -1,0 +1,19 @@
+{
+  "name": "terraform-aws-vantage-integration",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Terraform module for AWS Vantage integration",
+  "scripts": {
+    "release": "semantic-release"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.0.0",
+    "@commitlint/config-conventional": "^18.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^12.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^10.0.0",
+    "@semantic-release/release-notes-generator": "^13.0.0",
+    "semantic-release": "^23.0.0"
+  }
+}

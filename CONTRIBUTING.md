@@ -12,13 +12,39 @@ git clone https://github.com/your-github-username/terraform-aws-vantage-integrat
 
 ## Making Changes
 
-Make changes to the codebase and commit them to your local repository:
+Make changes to the codebase and commit them to your local repository.
+
+### Commit Message Format
+
+This repository uses [Conventional Commits](https://www.conventionalcommits.org/) for commit messages. All commits must follow this format:
 
 ```
-git add .
-git commit -m "A descriptive commit message about the changes."
-git push
+<type>: <description>
+
+[optional body]
+
+[optional footer]
 ```
+
+**Types:**
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, missing semi-colons, etc.)
+- `refactor`: Code refactoring without changing functionality
+- `perf`: Performance improvements
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks, dependency updates
+- `ci`: CI/CD configuration changes
+
+**Examples:**
+```
+feat: add support for cross-region replication
+fix: correct IAM policy permissions for S3 access
+docs: update README with installation instructions
+```
+
+Commits are validated automatically on pull requests. Non-conventional commits will cause the PR checks to fail.
 
 ## Submitting a Pull Request
 

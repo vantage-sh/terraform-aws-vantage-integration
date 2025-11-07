@@ -1,5 +1,6 @@
 terraform {
   required_providers {
+    # tflint-ignore: terraform_required_providers
     vantage = {
       source = "vantage-sh/vantage"
     }
@@ -238,7 +239,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     }
 
     resources = [
-      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}"
+      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn
     ]
   }
 
@@ -267,7 +268,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     ]
     principals {
       type        = "AWS"
-      identifiers = ["${aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn}"]
+      identifiers = [aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn]
     }
 
     resources = [
