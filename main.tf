@@ -261,7 +261,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
       variable = "aws:SourceArn"
       values = [
         "arn:aws:cur:us-east-1:${local.account_id}:definition/*",
-        "arn:aws:bcm-data-exports:us-east-1::export/*"
+        "arn:aws:bcm-data-exports:us-east-1:${local.account_id}:export/*"
       ]
     }
 
