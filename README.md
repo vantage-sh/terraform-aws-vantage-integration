@@ -6,6 +6,8 @@ This module handles linking an AWS account with your Vantage account. For root A
 
 This module configures an AWS Account integration on Vantage. By default, it does not configure a CUR integration. If the account is your root AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable to provision that. The bucket name is used for a private S3 bucket and must be globally unique.
 
+Using the module requires the `hashicorp/aws` and `vantage-sh/vantage` providers.
+
 The below examples assumes you'll use the [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) feature of the AWS provider to access the desired AWS account.
 
 ### Management AWS Account with Cost and Usage Reports (CUR) Integration
@@ -18,6 +20,13 @@ provider "aws" {
   assume_role {
     role_arn = "arn:aws:iam::123456789012:role/admin-role"
   }
+}
+
+provider "vantage" {
+  # A Vantage API Token is needed to use this module, it is recommended to either use env var VANTAGE_API_TOKEN
+  # or to use a tfvars file that's not committed to the repository. Follow the instructions here to create a new
+  # API Token: /vantage_account#create-an-api-token
+  api_token = YOUR_API_TOKEN
 }
 
 module "vantage-integration" {
@@ -41,6 +50,13 @@ provider "aws" {
   assume_role {
     role_arn = "arn:aws:iam::123456789012:role/admin-role"
   }
+}
+
+provider "vantage" {
+  # A Vantage API Token is needed to use this module, it is recommended to either use env var VANTAGE_API_TOKEN
+  # or to use a tfvars file that's not committed to the repository. Follow the instructions here to create a new
+  # API Token: /vantage_account#create-an-api-token
+  api_token = YOUR_API_TOKEN
 }
 
 module "vantage-integration" {
