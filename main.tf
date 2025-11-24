@@ -264,6 +264,10 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     effect    = "Allow"
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"]
+    principals {
+      type        = "Service"
+      identifiers = ["billingreports.amazonaws.com"]
+    }
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
