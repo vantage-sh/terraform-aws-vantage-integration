@@ -144,7 +144,7 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
   compression                = "GZIP"
   additional_schema_elements = var.cur_report_additional_schema_elements
   s3_bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
-  s3_region                  = "us-east-1"
+  s3_region                  = var.cur_bucket_region
   s3_prefix                  = "${lower(var.cur_report_time_unit)}-v1"
   report_versioning          = "OVERWRITE_REPORT"
   refresh_closed_reports     = true
