@@ -4,6 +4,12 @@ variable "cur_bucket_name" {
   default     = ""
 }
 
+variable "cur_bucket_region" {
+  type        = string
+  description = "The region where the CUR bucket will be created."
+  default     = "us-east-1"
+}
+
 variable "cur_bucket_lifecycle_enabled" {
   type        = bool
   description = "Enable lifecycle configuration for the CUR bucket."

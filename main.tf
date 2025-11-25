@@ -144,13 +144,14 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
   compression                = "GZIP"
   additional_schema_elements = var.cur_report_additional_schema_elements
   s3_bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
-  s3_region                  = "us-east-1"
+  s3_region                  = var.cur_bucket_region
   s3_prefix                  = "${lower(var.cur_report_time_unit)}-v1"
   report_versioning          = "OVERWRITE_REPORT"
   refresh_closed_reports     = true
   depends_on = [
     aws_s3_bucket_policy.vantage_cost_and_usage_reports
   ]
+  tags = var.tags
 }
 
 resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
@@ -173,6 +174,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports
 
   rule {
     id = "remove-old-reports"
+
+    filter {}
 
     expiration {
       days = var.cur_bucket_lifecycle_days
@@ -232,28 +235,24 @@ data "aws_iam_policy_document" "vantage_cur_retrieval" {
 data "aws_iam_policy_document" "vantage_cur_access" {
   count = var.cur_bucket_name != "" ? 1 : 0
 
+  # Legacy CUR reports
   statement {
+    sid    = "S3BucketPermissionsRetrieval"
     effect = "Allow"
-
-    actions = [
-      "s3:GetBucketAcl",
-      "s3:GetBucketPolicy"
-    ]
     principals {
       type        = "Service"
       identifiers = ["billingreports.amazonaws.com"]
     }
-
-    resources = [
-      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn
+    actions = [
+      "s3:GetBucketAcl",
+      "s3:GetBucketPolicy",
     ]
-
+    resources = [aws_s3_bucket.vantage_cost_and_usage_reports[0].arn]
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
       values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
     }
-
     condition {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
@@ -262,28 +261,57 @@ data "aws_iam_policy_document" "vantage_cur_access" {
   }
 
   statement {
-    effect = "Allow"
-
-    actions = [
-      "s3:PutObject"
-    ]
+    sid       = "S3PutObject"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"]
     principals {
       type        = "Service"
       identifiers = ["billingreports.amazonaws.com"]
     }
-
-    resources = [
-      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
-    ]
-
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
       values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
     }
-
     condition {
       test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
+    }
+  }
+
+  # CUR 2.0 reports
+  statement {
+    sid    = "EnableAWSDataExportsToWriteToS3AndCheckPolicy"
+    effect = "Allow"
+
+    principals {
+      type = "Service"
+      identifiers = [
+        "bcm-data-exports.amazonaws.com",
+        "billingreports.amazonaws.com"
+      ]
+    }
+    actions = [
+      "s3:PutObject",
+      "s3:GetBucketPolicy"
+    ]
+
+    resources = [
+      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
+      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
+    ]
+    condition {
+      test     = "StringLike"
+      variable = "aws:SourceArn"
+      values = [
+        "arn:aws:cur:us-east-1:${local.account_id}:definition/*",
+        "arn:aws:bcm-data-exports:us-east-1:${local.account_id}:export/*"
+      ]
+    }
+    condition {
+      test     = "StringLike"
       variable = "aws:SourceAccount"
       values   = [local.account_id]
     }
