@@ -151,6 +151,7 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
   depends_on = [
     aws_s3_bucket_policy.vantage_cost_and_usage_reports
   ]
+  tags = var.tags
 }
 
 resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
