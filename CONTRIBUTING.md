@@ -39,9 +39,9 @@ This repository uses [Conventional Commits](https://www.conventionalcommits.org/
 
 **Examples:**
 ```
-feat: add support for cross-region replication
-fix: correct IAM policy permissions for S3 access
-docs: update README with installation instructions
+feat: Add support for cross-region replication.
+fix: Correct IAM policy permissions for S3 access.
+docs: Update README with installation instructions.
 ```
 
 Commits are validated automatically on pull requests. Non-conventional commits will cause the PR checks to fail.
