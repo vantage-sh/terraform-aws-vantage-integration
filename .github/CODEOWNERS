@@ -1,1 +1,18 @@
+# Dependabot dependency manifests — @vantage-sh/engineering-platform
+# Tailored from .github/dependabot.yml + repo manifests (ecosystems: github-actions, npm, pre-commit, terraform).
+/.github/workflows/**/* @vantage-sh/engineering-platform
+/.pre-commit-config.yaml @vantage-sh/engineering-platform
+/.pre-commit-config.yml @vantage-sh/engineering-platform
+/.pre-commit.yaml @vantage-sh/engineering-platform
+/.pre-commit.yml @vantage-sh/engineering-platform
+/.terraform.lock.hcl @vantage-sh/engineering-platform
+/**/*.tf @vantage-sh/engineering-platform
+/**/*.tfvars @vantage-sh/engineering-platform
+/npm-shrinkwrap.json @vantage-sh/engineering-platform
+/package-lock.json @vantage-sh/engineering-platform
+/package.json @vantage-sh/engineering-platform
+/pnpm-lock.yaml @vantage-sh/engineering-platform
+/yarn.lock @vantage-sh/engineering-platform
+
+# Default repository ownership (paths not matched above)
 * @vantage-sh/engineering-persona @vantage-sh/engineering-platform
