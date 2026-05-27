@@ -137,7 +137,7 @@ resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with
 }
 
 resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
-  count                      = var.cur_bucket_name != "" ? 1 : 0
+  count                      = var.cur_bucket_name != "" && var.cur_report_enabled ? 1 : 0
   report_name                = var.cur_report_name
   time_unit                  = var.cur_report_time_unit
   format                     = "textORcsv"
