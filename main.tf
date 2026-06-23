@@ -45,42 +45,6 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
   assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
   permissions_boundary = var.permissions_boundary_arn
 
-  inline_policy {
-    name   = "VantageCostandUsageReportRetrieval"
-    policy = data.aws_iam_policy_document.vantage_cur_retrieval[0].json
-  }
-
-  inline_policy {
-    name   = "root"
-    policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
-  }
-
-  dynamic "inline_policy" {
-    for_each = var.enable_autopilot ? [1] : []
-    content {
-      name   = "VantageAutoPilot"
-      policy = data.vantage_aws_provider_info.default.autopilot_policy
-    }
-  }
-
-  inline_policy {
-    name   = "VantageCloudWatchMetricsReadOnly"
-    policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
-  }
-
-  inline_policy {
-    name   = "VantageAdditionalResourceReadOnly"
-    policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
-  }
-
-  dynamic "inline_policy" {
-    for_each = var.additional_inline_policies
-    content {
-      name   = inline_policy.value["name"]
-      policy = inline_policy.value["policy"]
-    }
-  }
-
   tags = var.tags
 }
 
@@ -90,38 +54,95 @@ resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
   assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
   permissions_boundary = var.permissions_boundary_arn
 
-  inline_policy {
-    name   = "root"
-    policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
-  }
-
-  dynamic "inline_policy" {
-    for_each = var.enable_autopilot ? [1] : []
-    content {
-      name   = "VantageAutoPilot"
-      policy = data.vantage_aws_provider_info.default.autopilot_policy
-    }
-  }
-
-  inline_policy {
-    name   = "VantageCloudWatchMetricsReadOnly"
-    policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
-  }
-
-  inline_policy {
-    name   = "VantageAdditionalResourceReadOnly"
-    policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
-  }
-
-  dynamic "inline_policy" {
-    for_each = var.additional_inline_policies
-    content {
-      name   = inline_policy.value["name"]
-      policy = inline_policy.value["policy"]
-    }
-  }
-
   tags = var.tags
+}
+
+resource "aws_iam_role_policy" "vantage_cur_retrieval" {
+  count = var.cur_bucket_name != "" ? 1 : 0
+
+  name   = "VantageCostandUsageReportRetrieval"
+  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  policy = data.aws_iam_policy_document.vantage_cur_retrieval[0].json
+}
+
+resource "aws_iam_role_policy" "vantage_root_with_bucket" {
+  count = var.cur_bucket_name != "" ? 1 : 0
+
+  name   = "root"
+  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
+}
+
+resource "aws_iam_role_policy" "vantage_root_without_bucket" {
+  count = var.cur_bucket_name != "" ? 0 : 1
+
+  name   = "root"
+  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
+  policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
+}
+
+resource "aws_iam_role_policy" "vantage_autopilot_with_bucket" {
+  count = var.cur_bucket_name != "" && var.enable_autopilot ? 1 : 0
+
+  name   = "VantageAutoPilot"
+  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  policy = data.vantage_aws_provider_info.default.autopilot_policy
+}
+
+resource "aws_iam_role_policy" "vantage_autopilot_without_bucket" {
+  count = var.cur_bucket_name == "" && var.enable_autopilot ? 1 : 0
+
+  name   = "VantageAutoPilot"
+  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
+  policy = data.vantage_aws_provider_info.default.autopilot_policy
+}
+
+resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_with_bucket" {
+  count = var.cur_bucket_name != "" ? 1 : 0
+
+  name   = "VantageCloudWatchMetricsReadOnly"
+  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
+}
+
+resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_without_bucket" {
+  count = var.cur_bucket_name != "" ? 0 : 1
+
+  name   = "VantageCloudWatchMetricsReadOnly"
+  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
+  policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
+}
+
+resource "aws_iam_role_policy" "vantage_additional_resources_with_bucket" {
+  count = var.cur_bucket_name != "" ? 1 : 0
+
+  name   = "VantageAdditionalResourceReadOnly"
+  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
+}
+
+resource "aws_iam_role_policy" "vantage_additional_resources_without_bucket" {
+  count = var.cur_bucket_name != "" ? 0 : 1
+
+  name   = "VantageAdditionalResourceReadOnly"
+  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
+  policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
+}
+
+resource "aws_iam_role_policy" "additional_inline_policies_with_bucket" {
+  for_each = var.cur_bucket_name != "" ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
+
+  name   = each.value["name"]
+  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  policy = each.value["policy"]
+}
+
+resource "aws_iam_role_policy" "additional_inline_policies_without_bucket" {
+  for_each = var.cur_bucket_name == "" ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
+
+  name   = each.value["name"]
+  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
+  policy = each.value["policy"]
 }
 
 resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with_bucket" {
