@@ -22,6 +22,12 @@ variable "cur_bucket_lifecycle_days" {
   default     = 200
 }
 
+variable "enforce_https_only" {
+  type        = bool
+  default     = true
+  description = "Deny plain-HTTP S3 requests from non-AWS-service principals on the CUR bucket."
+}
+
 variable "cur_report_time_unit" {
   description = "The granularity of the cost and usage report: HOURLY or DAILY."
   type        = string
