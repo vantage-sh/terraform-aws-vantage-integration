@@ -8,7 +8,15 @@ This module handles linking an AWS account with your Vantage account. For root A
 
 This module configures an AWS Account integration on Vantage. By default, it does not configure a CUR integration. If the account is your root AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable to provision that. The bucket name is used for a private S3 bucket and must be globally unique.
 
-By default, the bucket is provisioned in the `us-east-1` region. If you want to provision the bucket in a different region, use the `cur_bucket_region` variable.
+By default, the bucket is provisioned in the `us-east-1` region. The AWS provider region and `cur_bucket_region` must match so the S3 bucket, CUR definition, and Vantage SNS topic are in the same region.
+
+Vantage supports CUR buckets in the following regions:
+
+- `ap-southeast-1`
+- `eu-west-1`
+- `eu-west-2`
+- `us-east-1`
+- `us-west-2`
 
 The below examples assume you'll use the [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) feature of the AWS provider to access the desired AWS account.
 
@@ -29,9 +37,10 @@ module "vantage-integration" {
 
   # Bucket names must be globally unique. It is provisioned with private acl's
   # and only accessed by Vantage via the provisioned cross account role.
-  cur_bucket_name        = "my-company-cur-vantage"
+  cur_bucket_name   = "my-company-cur-vantage"
+  cur_bucket_region = "us-east-1"
   # Optional: granularity of the CUR report: "HOURLY" or "DAILY"
-  cur_report_time_unit   = "HOURLY"
+  cur_report_time_unit = "HOURLY"
 }
 ```
 

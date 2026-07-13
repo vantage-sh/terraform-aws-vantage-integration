@@ -6,8 +6,19 @@ variable "cur_bucket_name" {
 
 variable "cur_bucket_region" {
   type        = string
-  description = "The region where the CUR bucket will be created."
+  description = "The supported AWS region where the CUR bucket will be created. The AWS provider must use the same region."
   default     = "us-east-1"
+
+  validation {
+    condition = contains([
+      "ap-southeast-1",
+      "eu-west-1",
+      "eu-west-2",
+      "us-east-1",
+      "us-west-2",
+    ], var.cur_bucket_region)
+    error_message = "cur_bucket_region must be one of: ap-southeast-1, eu-west-1, eu-west-2, us-east-1, us-west-2."
+  }
 }
 
 variable "cur_bucket_lifecycle_enabled" {
@@ -35,8 +46,8 @@ variable "cur_report_time_unit" {
 
 variable "vantage_sns_topic_arn" {
   type        = string
-  description = "SNS Topic used to notify of bucket events, such as CUR files being updated. Default is the production SNS topic used by Vantage and should not be changed except for module development."
-  default     = "arn:aws:sns:us-east-1:630399649041:cost-and-usage-report-uploaded"
+  description = "Optional override for the Vantage SNS topic used to notify Vantage of CUR bucket events. This should only be changed for module development."
+  default     = null
 }
 
 variable "cur_report_name" {
