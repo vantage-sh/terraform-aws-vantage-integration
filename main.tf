@@ -340,6 +340,39 @@ data "aws_iam_policy_document" "vantage_cur_access" {
       "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
     ]
   }
+
+  dynamic "statement" {
+    for_each = var.enforce_https_only ? [1] : []
+
+    content {
+      sid    = "AllowSSLRequestsOnly"
+      effect = "Deny"
+
+      principals {
+        type        = "*"
+        identifiers = ["*"]
+      }
+
+      actions = ["s3:*"]
+
+      resources = [
+        aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
+        "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*",
+      ]
+
+      condition {
+        test     = "Bool"
+        variable = "aws:SecureTransport"
+        values   = ["false"]
+      }
+
+      condition {
+        test     = "BoolIfExists"
+        variable = "aws:PrincipalIsAWSService"
+        values   = ["false"]
+      }
+    }
+  }
 }
 
 resource "vantage_aws_provider" "with_bucket" {
