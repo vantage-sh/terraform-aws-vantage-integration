@@ -16,6 +16,14 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
+  vantage_sns_topic_arns = {
+    ap-southeast-1 = "arn:aws:sns:ap-southeast-1:630399649041:cost-and-usage-report-uploaded"
+    eu-west-1      = "arn:aws:sns:eu-west-1:630399649041:cost-and-usage-report-uploaded"
+    eu-west-2      = "arn:aws:sns:eu-west-2:630399649041:cost-and-usage-report-uploaded"
+    us-east-1      = "arn:aws:sns:us-east-1:630399649041:cost-and-usage-report-uploaded"
+    us-west-2      = "arn:aws:sns:us-west-2:630399649041:cost-and-usage-report-uploaded"
+  }
+  vantage_sns_topic_arn = var.vantage_sns_topic_arn != null ? var.vantage_sns_topic_arn : local.vantage_sns_topic_arns[var.cur_bucket_region]
 }
 
 data "vantage_aws_provider_info" "default" {
@@ -206,7 +214,7 @@ resource "aws_s3_bucket_notification" "vantage_cost_and_usage_reports" {
   count  = var.cur_bucket_name != "" ? 1 : 0
   bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
   topic {
-    topic_arn     = var.vantage_sns_topic_arn
+    topic_arn     = local.vantage_sns_topic_arn
     events        = ["s3:ObjectCreated:*"]
     filter_suffix = ".csv.gz"
   }
