@@ -9,7 +9,7 @@ terraform {
       version = ">= 4.0.0"
     }
   }
-  required_version = ">= 1.0.0"
+  required_version = ">= 1.3.0"
 }
 
 data "aws_caller_identity" "current" {}
@@ -24,6 +24,20 @@ locals {
     us-west-2      = "arn:aws:sns:us-west-2:630399649041:cost-and-usage-report-uploaded"
   }
   vantage_sns_topic_arn = var.vantage_sns_topic_arn != null ? var.vantage_sns_topic_arn : local.vantage_sns_topic_arns[var.cur_bucket_region]
+
+  # Prefer explicit lifecycle rules when set (including [] to disable). Otherwise use
+  # the simple enabled/days settings so existing module callers remain unchanged.
+  cur_bucket_lifecycle_rules = var.cur_bucket_lifecycle_rules != null ? var.cur_bucket_lifecycle_rules : (
+    var.cur_bucket_lifecycle_enabled ? [
+      {
+        id              = "remove-old-reports"
+        enabled         = true
+        prefix          = null
+        expiration_days = var.cur_bucket_lifecycle_days
+        transitions     = []
+      }
+    ] : []
+  )
 }
 
 data "vantage_aws_provider_info" "default" {
@@ -197,19 +211,37 @@ resource "aws_s3_bucket_acl" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports" {
-  count  = var.cur_bucket_name != "" && var.cur_bucket_lifecycle_enabled ? 1 : 0
+  count  = var.cur_bucket_name != "" && length(local.cur_bucket_lifecycle_rules) > 0 ? 1 : 0
   bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
 
-  rule {
-    id = "remove-old-reports"
+  dynamic "rule" {
+    for_each = local.cur_bucket_lifecycle_rules
 
-    filter {}
+    content {
+      id     = rule.value.id
+      status = coalesce(rule.value.enabled, true) ? "Enabled" : "Disabled"
 
-    expiration {
-      days = var.cur_bucket_lifecycle_days
+      filter {
+        prefix = rule.value.prefix != null ? rule.value.prefix : ""
+      }
+
+      dynamic "expiration" {
+        for_each = try(rule.value.expiration_days, null) != null ? [rule.value.expiration_days] : []
+
+        content {
+          days = expiration.value
+        }
+      }
+
+      dynamic "transition" {
+        for_each = try(rule.value.transitions, [])
+
+        content {
+          days          = transition.value.days
+          storage_class = transition.value.storage_class
+        }
+      }
     }
-
-    status = "Enabled"
   }
 }
 
