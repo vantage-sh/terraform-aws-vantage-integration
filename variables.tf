@@ -56,6 +56,12 @@ variable "cur_report_name" {
   default     = "VantageReport"
 }
 
+variable "cur_report_enabled" {
+  type        = bool
+  description = "Enable creation of the CUR report definition. Set to false if you want the S3 bucket but not the aws_cur_report_definition resource (e.g., when using self-managed CUR 2.0 Data Exports instead)."
+  default     = true
+}
+
 variable "compatibility_private_bucket_acl" {
   type        = bool
   description = "For backwards compatibility, users can set this variable to true so a 'private' bucket ACL is applied. This is not necessary for new buckets being created. If you're unsure, leave this as false."
