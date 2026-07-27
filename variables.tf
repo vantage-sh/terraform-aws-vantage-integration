@@ -21,15 +21,38 @@ variable "cur_bucket_region" {
   }
 }
 
+variable "cur_bucket_lifecycle_rules" {
+  type = list(object({
+    id              = string
+    enabled         = optional(bool, true)
+    prefix          = optional(string)
+    expiration_days = optional(number)
+    transitions = optional(list(object({
+      days          = number
+      storage_class = string
+    })), [])
+  }))
+  description = "Advanced lifecycle rules for the CUR bucket. Set to [] to disable lifecycle configuration. When null, cur_bucket_lifecycle_enabled and cur_bucket_lifecycle_days configure the default rule."
+  default     = null
+
+  validation {
+    condition = var.cur_bucket_lifecycle_rules == null ? true : alltrue([
+      for rule in var.cur_bucket_lifecycle_rules :
+      try(rule.expiration_days, null) != null || length(try(rule.transitions, [])) > 0
+    ])
+    error_message = "Each cur_bucket_lifecycle_rules entry must set expiration_days and/or at least one transition."
+  }
+}
+
 variable "cur_bucket_lifecycle_enabled" {
   type        = bool
-  description = "Enable lifecycle configuration for the CUR bucket."
+  description = "Whether to create the default CUR bucket lifecycle rule when cur_bucket_lifecycle_rules is null."
   default     = true
 }
 
 variable "cur_bucket_lifecycle_days" {
   type        = number
-  description = "Number of days to retain CUR reports in the bucket."
+  description = "Retention period, in days, for the default CUR bucket lifecycle rule when cur_bucket_lifecycle_rules is null."
   default     = 200
 }
 

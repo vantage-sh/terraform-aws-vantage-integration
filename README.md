@@ -41,6 +41,21 @@ module "vantage-integration" {
   cur_bucket_region = "us-east-1"
   # Optional: granularity of the CUR report: "HOURLY" or "DAILY"
   cur_report_time_unit = "HOURLY"
+  # Optional: customize CUR bucket lifecycle (default retains the historical
+  # remove-old-reports / 200-day expiration behavior via the simple settings).
+  # Set to [] to disable lifecycle rules.
+  # cur_bucket_lifecycle_rules = [
+  #   {
+  #     id              = "remove-old-reports"
+  #     expiration_days = 200
+  #     transitions = [
+  #       {
+  #         days          = 30
+  #         storage_class = "STANDARD_IA"
+  #       }
+  #     ]
+  #   }
+  # ]
 }
 ```
 
