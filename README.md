@@ -59,6 +59,26 @@ module "vantage-integration" {
 }
 ```
 
+#### Self-managed CUR 2.0 Data Export
+
+To create the bucket and Vantage integration without also creating the legacy
+`aws_cur_report_definition`, disable report creation and manage an
+`aws_bcmdataexports_export` separately:
+
+```hcl
+module "vantage-integration" {
+  source = "vantage-sh/vantage-integration/aws"
+
+  cur_bucket_name    = "my-company-cur-vantage"
+  cur_bucket_region  = "us-east-1"
+  cur_report_enabled = false
+}
+```
+
+Target the module-managed bucket from the Data Export and configure gzip CSV
+output so the existing `.csv.gz` S3 notification delivers report updates to
+Vantage.
+
 ### Member account
 
 This is an example for creating a member AWS account integration. A cross account IAM role is created for use in gathering cost recommendations, active resources, etc. by Vantage.
