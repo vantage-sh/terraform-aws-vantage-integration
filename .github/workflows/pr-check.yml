@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@v7.0.0
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6.2.2
+        uses: terraform-linters/setup-tflint@v6.3.0
 
       - name: Initialize TFLint
         run: tflint --init
