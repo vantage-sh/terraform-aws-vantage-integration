@@ -63,7 +63,7 @@ variable "enforce_https_only" {
 }
 
 variable "cur_report_time_unit" {
-  description = "The granularity of the cost and usage report: HOURLY or DAILY."
+  description = "The granularity of the CUR 2.0 data export: HOURLY or DAILY."
   type        = string
   default     = "DAILY"
 
@@ -81,13 +81,13 @@ variable "vantage_sns_topic_arn" {
 
 variable "cur_report_name" {
   type        = string
-  description = "Report name for the CUR report definition."
+  description = "Name of the CUR 2.0 data export."
   default     = "VantageReport"
 }
 
 variable "cur_report_enabled" {
   type        = bool
-  description = "Whether to create the legacy CUR report definition. Set to false when managing a CUR 2.0 Data Export separately."
+  description = "Whether to create the CUR 2.0 data export. Set to false when managing the data export separately."
   default     = true
 }
 
@@ -134,7 +134,7 @@ variable "tags" {
 }
 
 variable "cur_report_additional_schema_elements" {
-  description = "A list of additional schema elements for the cur report. Only used if a cur bucket is specified."
+  description = "Additional schema elements for the CUR 2.0 data export. Include RESOURCES to export resource IDs."
   type        = list(string)
   default     = ["RESOURCES"]
 }
