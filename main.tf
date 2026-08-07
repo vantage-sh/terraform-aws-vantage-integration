@@ -204,7 +204,7 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
     destination_configurations {
       s3_destination {
         s3_bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
-        s3_prefix = "${lower(var.cur_report_time_unit)}-v2"
+        s3_prefix = "${lower(var.cur_report_time_unit)}-v1"
         s3_region = var.cur_bucket_region
 
         s3_output_configurations {
