@@ -192,7 +192,7 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
         COST_AND_USAGE_REPORT = {
           BILLING_VIEW_ARN                      = "arn:${data.aws_partition.current.partition}:billing::${local.account_id}:billingview/primary"
           TIME_GRANULARITY                      = var.cur_report_time_unit
-          INCLUDE_RESOURCES                     = contains(var.cur_report_additional_schema_elements, "RESOURCES") ? "TRUE" : "FALSE"
+          INCLUDE_RESOURCES                     = "TRUE"
           INCLUDE_SPLIT_COST_ALLOCATION_DATA    = "FALSE"
           INCLUDE_CAPACITY_RESERVATION_DATA     = "FALSE"
           INCLUDE_IAM_PRINCIPAL_DATA            = "TRUE"
