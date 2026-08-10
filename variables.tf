@@ -63,7 +63,7 @@ variable "enforce_https_only" {
 }
 
 variable "cur_report_time_unit" {
-  description = "The granularity of the CUR 2.0 data export: HOURLY or DAILY."
+  description = "The granularity of the cost and usage report: HOURLY or DAILY."
   type        = string
   default     = "DAILY"
 
@@ -131,12 +131,6 @@ variable "tags" {
   description = "A map of tags to add to all supported resources managed by the module."
   type        = map(string)
   default     = {}
-}
-
-variable "cur_report_additional_schema_elements" {
-  description = "Additional schema elements for the CUR 2.0 data export. Include RESOURCES to export resource IDs."
-  type        = list(string)
-  default     = ["RESOURCES"]
 }
 
 variable "permissions_boundary_arn" {
