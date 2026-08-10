@@ -221,8 +221,6 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
     }
   }
 
-  tags = var.tags
-
   depends_on = [
     aws_s3_bucket_policy.vantage_cost_and_usage_reports
   ]
