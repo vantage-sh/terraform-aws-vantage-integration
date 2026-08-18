@@ -79,9 +79,10 @@ Target the module-managed bucket from the Data Export and configure gzip CSV
 output so the existing `.csv.gz` S3 notification delivers report updates to
 Vantage.
 
-When upgrading from a module version that managed a legacy CUR 1.0 report, the
-next Terraform apply replaces `aws_cur_report_definition` with
-`aws_bcmdataexports_export`.
+When upgrading from a module version that managed a legacy CUR 1.0 report,
+`upgrade_to_cur_2 = true` (the default) replaces `aws_cur_report_definition`
+with `aws_bcmdataexports_export`. Set `upgrade_to_cur_2 = false` to continue
+managing only the legacy CUR 1.0 report.
 
 When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
 

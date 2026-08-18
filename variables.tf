@@ -81,13 +81,19 @@ variable "vantage_sns_topic_arn" {
 
 variable "cur_report_name" {
   type        = string
-  description = "Name of the CUR 2.0 data export."
+  description = "Name of the managed CUR report."
   default     = "VantageReport"
 }
 
 variable "cur_report_enabled" {
   type        = bool
-  description = "Whether to create the CUR 2.0 data export. Set to false when managing the data export separately."
+  description = "Whether to create a CUR report. Set to false when managing the report separately."
+  default     = true
+}
+
+variable "upgrade_to_cur_2" {
+  type        = bool
+  description = "Whether to replace the legacy CUR 1.0 report definition with a CUR 2.0 data export."
   default     = true
 }
 
