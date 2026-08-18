@@ -180,6 +180,24 @@ resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
+resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
+  count                      = var.cur_bucket_name != "" && var.cur_report_enabled && !var.delete_legacy_cur_report ? 1 : 0
+  report_name                = var.cur_report_name
+  time_unit                  = var.cur_report_time_unit
+  format                     = "textORcsv"
+  compression                = "GZIP"
+  additional_schema_elements = ["RESOURCES"]
+  s3_bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  s3_region                  = var.cur_bucket_region
+  s3_prefix                  = "${lower(var.cur_report_time_unit)}-v1"
+  report_versioning          = "OVERWRITE_REPORT"
+  refresh_closed_reports     = true
+
+  depends_on = [
+    aws_s3_bucket_policy.vantage_cost_and_usage_reports
+  ]
+}
+
 resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
   count = var.cur_bucket_name != "" && var.cur_report_enabled ? 1 : 0
 

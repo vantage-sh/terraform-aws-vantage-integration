@@ -91,6 +91,12 @@ variable "cur_report_enabled" {
   default     = true
 }
 
+variable "delete_legacy_cur_report" {
+  type        = bool
+  description = "Whether to delete the legacy CUR 1.0 report definition when creating the CUR 2.0 data export."
+  default     = true
+}
+
 variable "compatibility_private_bucket_acl" {
   type        = bool
   description = "For backwards compatibility, users can set this variable to true so a 'private' bucket ACL is applied. This is not necessary for new buckets being created. If you're unsure, leave this as false."
