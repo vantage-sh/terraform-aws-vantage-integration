@@ -1,14 +1,14 @@
 # terraform-vantage-integrations
 
-This module handles linking an AWS account with your Vantage account. For root AWS accounts, you will want to provision a CUR bucket via the `cur_bucket_name` variable. For subaccounts you will want to link access but won't need to configure the CUR bucket.
+This module handles linking an AWS account with your Vantage account. For management AWS accounts, use the `cur_bucket_name` variable to provision an Amazon S3 bucket and Cost and Usage Report (CUR). Member accounts need cross-account access but do not need their own CUR bucket.
 
-> **Before you begin:** A Vantage API token with **Write** scope, assigned to the **Everyone** team, is required. See [the Vantage documentation](https://docs.vantage.sh/api/authentication) for information on how to create a token. Set the `VANTAGE_API_TOKEN` environment variable (or configure the provider’s `api_token`) before running Terraform.
+> **Before you begin:** A Vantage API token with **Write** scope, assigned to the **Everyone** team, is required. See [the Vantage documentation](https://docs.vantage.sh/api/authentication) for information on how to create a token. Set the `VANTAGE_API_TOKEN` environment variable (or configure the provider’s `api_token`) before running Terraform. This module requires version 5.48.0 or newer of the HashiCorp AWS provider.
 
 ## Usage
 
-This module configures an AWS Account integration on Vantage. By default, it does not configure a CUR integration. If the account is your root AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable to provision that. The bucket name is used for a private S3 bucket and must be globally unique.
+This module configures an AWS account integration on Vantage. By default, it does not configure a CUR integration. If the account is your management AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable. The bucket name is used for a private S3 bucket and must be globally unique.
 
-By default, the bucket is provisioned in the `us-east-1` region. The AWS provider region and `cur_bucket_region` must match so the S3 bucket, CUR definition, and Vantage SNS topic are in the same region.
+By default, the bucket is provisioned in the `us-east-1` region. The AWS provider region and `cur_bucket_region` must match so the S3 bucket and Vantage Simple Notification Service (SNS) topic are in the same region.
 
 Vantage supports CUR buckets in the following regions:
 
@@ -20,9 +20,9 @@ Vantage supports CUR buckets in the following regions:
 
 The below examples assume you'll use the [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) feature of the AWS provider to access the desired AWS account.
 
-### Management AWS Account with Cost and Usage Reports (CUR) Integration
+### Management AWS Account with CUR 2.0 Integration
 
-This is an example for creating a management (root) AWS account integration where CUR and an S3 bucket are provisioned in addition to the cross account IAM role. Creating the CUR bucket in your root account is _highly recommended_.
+This example creates a management AWS account integration with a CUR 2.0 data export, S3 bucket, and cross-account Identity and Access Management (IAM) role. Creating the CUR bucket in your management account is _highly recommended_.
 
 ```hcl
 provider "aws" {
@@ -39,7 +39,9 @@ module "vantage-integration" {
   # and only accessed by Vantage via the provisioned cross account role.
   cur_bucket_name   = "my-company-cur-vantage"
   cur_bucket_region = "us-east-1"
-  # Optional: granularity of the CUR report: "HOURLY" or "DAILY"
+  # Opt in to replacing the legacy CUR 1.0 report with CUR 2.0.
+  upgrade_to_cur_2 = true
+  # Optional: granularity of the CUR 2.0 data export: "HOURLY" or "DAILY"
   cur_report_time_unit = "HOURLY"
   # Optional: customize CUR bucket lifecycle (default retains the historical
   # remove-old-reports / 200-day expiration behavior via the simple settings).
@@ -61,8 +63,8 @@ module "vantage-integration" {
 
 #### Self-managed CUR 2.0 Data Export
 
-To create the bucket and Vantage integration without also creating the legacy
-`aws_cur_report_definition`, disable report creation and manage an
+To create the bucket and Vantage integration without also creating the module's
+`aws_bcmdataexports_export`, disable report creation and manage an
 `aws_bcmdataexports_export` separately:
 
 ```hcl
@@ -78,6 +80,12 @@ module "vantage-integration" {
 Target the module-managed bucket from the Data Export and configure gzip CSV
 output so the existing `.csv.gz` S3 notification delivers report updates to
 Vantage.
+
+When upgrading from a module version that managed a legacy CUR 1.0 report,
+remove the `cur_report_additional_schema_elements` input and run
+`terraform init -upgrade`. The module continues managing the legacy report by
+default. Set `upgrade_to_cur_2 = true` to replace `aws_cur_report_definition`
+with `aws_bcmdataexports_export`.
 
 When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
 

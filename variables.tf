@@ -81,14 +81,20 @@ variable "vantage_sns_topic_arn" {
 
 variable "cur_report_name" {
   type        = string
-  description = "Report name for the CUR report definition."
+  description = "Name of the managed CUR report."
   default     = "VantageReport"
 }
 
 variable "cur_report_enabled" {
   type        = bool
-  description = "Whether to create the legacy CUR report definition. Set to false when managing a CUR 2.0 Data Export separately."
+  description = "Whether to create a CUR report. Set to false when managing the report separately."
   default     = true
+}
+
+variable "upgrade_to_cur_2" {
+  type        = bool
+  description = "Whether to replace the legacy CUR 1.0 report definition with a CUR 2.0 data export."
+  default     = false
 }
 
 variable "compatibility_private_bucket_acl" {
@@ -131,12 +137,6 @@ variable "tags" {
   description = "A map of tags to add to all supported resources managed by the module."
   type        = map(string)
   default     = {}
-}
-
-variable "cur_report_additional_schema_elements" {
-  description = "A list of additional schema elements for the cur report. Only used if a cur bucket is specified."
-  type        = list(string)
-  default     = ["RESOURCES"]
 }
 
 variable "permissions_boundary_arn" {
