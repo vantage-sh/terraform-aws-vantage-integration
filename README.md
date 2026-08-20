@@ -2,7 +2,7 @@
 
 This module handles linking an AWS account with your Vantage account. For management AWS accounts, use the `cur_bucket_name` variable to provision an Amazon S3 bucket and Cost and Usage Report (CUR) 2.0 data export. Member accounts need cross-account access but do not need their own CUR bucket.
 
-> **Before you begin:** A Vantage API token with **Write** scope, assigned to the **Everyone** team, is required. See [the Vantage documentation](https://docs.vantage.sh/api/authentication) for information on how to create a token. Set the `VANTAGE_API_TOKEN` environment variable (or configure the provider’s `api_token`) before running Terraform.
+> **Before you begin:** A Vantage API token with **Write** scope, assigned to the **Everyone** team, is required. See [the Vantage documentation](https://docs.vantage.sh/api/authentication) for information on how to create a token. Set the `VANTAGE_API_TOKEN` environment variable (or configure the provider’s `api_token`) before running Terraform. This module requires version 5.48.0 or newer of the HashiCorp AWS provider.
 
 ## Usage
 
@@ -80,9 +80,10 @@ output so the existing `.csv.gz` S3 notification delivers report updates to
 Vantage.
 
 When upgrading from a module version that managed a legacy CUR 1.0 report,
-`upgrade_to_cur_2 = true` (the default) replaces `aws_cur_report_definition`
-with `aws_bcmdataexports_export`. Set `upgrade_to_cur_2 = false` to continue
-managing only the legacy CUR 1.0 report.
+remove the `cur_report_additional_schema_elements` input and run
+`terraform init -upgrade`. `upgrade_to_cur_2 = true` (the default) replaces
+`aws_cur_report_definition` with `aws_bcmdataexports_export`. Set
+`upgrade_to_cur_2 = false` to continue managing only the legacy CUR 1.0 report.
 
 When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
 
