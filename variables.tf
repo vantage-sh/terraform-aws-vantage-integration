@@ -94,7 +94,7 @@ variable "cur_report_enabled" {
 variable "upgrade_to_cur_2" {
   type        = bool
   description = "Whether to replace the legacy CUR 1.0 report definition with a CUR 2.0 data export."
-  default     = true
+  default     = false
 }
 
 variable "compatibility_private_bucket_acl" {
