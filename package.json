@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^21.1.0",
-    "@commitlint/config-conventional": "^21.1.0",
+    "@commitlint/config-conventional": "^21.2.0",
     "semantic-release": "^25.0.9"
   },
   "release": {
