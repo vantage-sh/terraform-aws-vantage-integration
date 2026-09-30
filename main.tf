@@ -12,11 +12,40 @@ terraform {
   required_version = ">= 1.3.0"
 }
 
-data "aws_caller_identity" "current" {}
+data "aws_caller_identity" "current" {
+  lifecycle {
+    precondition {
+      condition     = var.cur_bucket_name == "" || var.existing_cur_bucket_name == ""
+      error_message = "Only one of cur_bucket_name or existing_cur_bucket_name can be set."
+    }
+  }
+}
 data "aws_partition" "current" {}
+
+data "aws_s3_bucket" "existing_cur_bucket" {
+  count  = local.use_existing_cur_bucket ? 1 : 0
+  bucket = var.existing_cur_bucket_name
+}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
+
+  create_cur_bucket       = var.cur_bucket_name != ""
+  use_existing_cur_bucket = var.existing_cur_bucket_name != ""
+  cur_bucket_enabled      = local.create_cur_bucket || local.use_existing_cur_bucket
+  manage_cur_bucket_policy = local.create_cur_bucket || (
+    local.use_existing_cur_bucket && var.existing_cur_bucket_manage_policy
+  )
+  manage_cur_bucket_notification = local.create_cur_bucket || (
+    local.use_existing_cur_bucket && var.existing_cur_bucket_manage_notification
+  )
+
+  cur_bucket_id = local.create_cur_bucket ? aws_s3_bucket.vantage_cost_and_usage_reports[0].id : (
+    local.use_existing_cur_bucket ? data.aws_s3_bucket.existing_cur_bucket[0].id : null
+  )
+  cur_bucket_arn = local.create_cur_bucket ? aws_s3_bucket.vantage_cost_and_usage_reports[0].arn : (
+    local.use_existing_cur_bucket ? data.aws_s3_bucket.existing_cur_bucket[0].arn : null
+  )
   vantage_sns_topic_arns = {
     ap-southeast-1 = "arn:aws:sns:ap-southeast-1:630399649041:cost-and-usage-report-uploaded"
     eu-west-1      = "arn:aws:sns:eu-west-1:630399649041:cost-and-usage-report-uploaded"
@@ -62,7 +91,7 @@ data "aws_iam_policy_document" "vantage_assume_role" {
 }
 
 resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
 
   name                 = "vantage_cross_account_connection"
   assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
@@ -72,7 +101,7 @@ resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
 }
 
 resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
-  count                = var.cur_bucket_name != "" ? 0 : 1
+  count                = local.cur_bucket_enabled ? 0 : 1
   name                 = "vantage_cross_account_connection"
   assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
   permissions_boundary = var.permissions_boundary_arn
@@ -81,7 +110,7 @@ resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_cur_retrieval" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
 
   name   = "VantageCostandUsageReportRetrieval"
   role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
@@ -89,7 +118,7 @@ resource "aws_iam_role_policy" "vantage_cur_retrieval" {
 }
 
 resource "aws_iam_role_policy" "vantage_root_with_bucket" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
 
   name   = "root"
   role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
@@ -97,7 +126,7 @@ resource "aws_iam_role_policy" "vantage_root_with_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_root_without_bucket" {
-  count = var.cur_bucket_name != "" ? 0 : 1
+  count = local.cur_bucket_enabled ? 0 : 1
 
   name   = "root"
   role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
@@ -105,7 +134,7 @@ resource "aws_iam_role_policy" "vantage_root_without_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_autopilot_with_bucket" {
-  count = var.cur_bucket_name != "" && var.enable_autopilot ? 1 : 0
+  count = local.cur_bucket_enabled && var.enable_autopilot ? 1 : 0
 
   name   = "VantageAutoPilot"
   role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
@@ -113,7 +142,7 @@ resource "aws_iam_role_policy" "vantage_autopilot_with_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_autopilot_without_bucket" {
-  count = var.cur_bucket_name == "" && var.enable_autopilot ? 1 : 0
+  count = !local.cur_bucket_enabled && var.enable_autopilot ? 1 : 0
 
   name   = "VantageAutoPilot"
   role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
@@ -121,7 +150,7 @@ resource "aws_iam_role_policy" "vantage_autopilot_without_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_with_bucket" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
 
   name   = "VantageCloudWatchMetricsReadOnly"
   role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
@@ -129,7 +158,7 @@ resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_with_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_without_bucket" {
-  count = var.cur_bucket_name != "" ? 0 : 1
+  count = local.cur_bucket_enabled ? 0 : 1
 
   name   = "VantageCloudWatchMetricsReadOnly"
   role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
@@ -137,7 +166,7 @@ resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_without_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_additional_resources_with_bucket" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
 
   name   = "VantageAdditionalResourceReadOnly"
   role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
@@ -145,7 +174,7 @@ resource "aws_iam_role_policy" "vantage_additional_resources_with_bucket" {
 }
 
 resource "aws_iam_role_policy" "vantage_additional_resources_without_bucket" {
-  count = var.cur_bucket_name != "" ? 0 : 1
+  count = local.cur_bucket_enabled ? 0 : 1
 
   name   = "VantageAdditionalResourceReadOnly"
   role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
@@ -153,7 +182,7 @@ resource "aws_iam_role_policy" "vantage_additional_resources_without_bucket" {
 }
 
 resource "aws_iam_role_policy" "additional_inline_policies_with_bucket" {
-  for_each = var.cur_bucket_name != "" ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
+  for_each = local.cur_bucket_enabled ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
 
   name   = each.value["name"]
   role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
@@ -161,7 +190,7 @@ resource "aws_iam_role_policy" "additional_inline_policies_with_bucket" {
 }
 
 resource "aws_iam_role_policy" "additional_inline_policies_without_bucket" {
-  for_each = var.cur_bucket_name == "" ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
+  for_each = !local.cur_bucket_enabled ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
 
   name   = each.value["name"]
   role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
@@ -169,25 +198,25 @@ resource "aws_iam_role_policy" "additional_inline_policies_without_bucket" {
 }
 
 resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with_bucket" {
-  count      = var.cur_bucket_name != "" ? 1 : 0
+  count      = local.cur_bucket_enabled ? 1 : 0
   role       = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_without_bucket" {
-  count      = var.cur_bucket_name != "" ? 0 : 1
+  count      = local.cur_bucket_enabled ? 0 : 1
   role       = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
 resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
-  count                      = var.cur_bucket_name != "" && var.cur_report_enabled && !var.upgrade_to_cur_2 ? 1 : 0
+  count                      = local.cur_bucket_enabled && var.cur_report_enabled && !var.upgrade_to_cur_2 ? 1 : 0
   report_name                = var.cur_report_name
   time_unit                  = var.cur_report_time_unit
   format                     = "textORcsv"
   compression                = "GZIP"
   additional_schema_elements = ["RESOURCES"]
-  s3_bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  s3_bucket                  = local.cur_bucket_id
   s3_region                  = var.cur_bucket_region
   s3_prefix                  = "${lower(var.cur_report_time_unit)}-v1"
   report_versioning          = "OVERWRITE_REPORT"
@@ -199,7 +228,7 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
-  count = var.cur_bucket_name != "" && var.cur_report_enabled && var.upgrade_to_cur_2 ? 1 : 0
+  count = local.cur_bucket_enabled && var.cur_report_enabled && var.upgrade_to_cur_2 ? 1 : 0
 
   export {
     name = var.cur_report_name
@@ -221,7 +250,7 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
 
     destination_configurations {
       s3_destination {
-        s3_bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+        s3_bucket = local.cur_bucket_id
         s3_prefix = "${lower(var.cur_report_time_unit)}-v1"
         s3_region = var.cur_bucket_region
 
@@ -245,7 +274,7 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
-  count         = var.cur_bucket_name != "" ? 1 : 0
+  count         = local.create_cur_bucket ? 1 : 0
   bucket        = var.cur_bucket_name
   force_destroy = true
 
@@ -253,14 +282,14 @@ resource "aws_s3_bucket" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_acl" "vantage_cost_and_usage_reports" {
-  count  = var.compatibility_private_bucket_acl ? 1 : 0
-  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  count  = local.create_cur_bucket && var.compatibility_private_bucket_acl ? 1 : 0
+  bucket = local.cur_bucket_id
   acl    = "private"
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports" {
-  count  = var.cur_bucket_name != "" && length(local.cur_bucket_lifecycle_rules) > 0 ? 1 : 0
-  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  count  = local.create_cur_bucket && length(local.cur_bucket_lifecycle_rules) > 0 ? 1 : 0
+  bucket = local.cur_bucket_id
 
   dynamic "rule" {
     for_each = local.cur_bucket_lifecycle_rules
@@ -294,8 +323,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "vantage_cost_and_usage_reports
 }
 
 resource "aws_s3_bucket_public_access_block" "vantage_cost_and_usage_reports" {
-  count                   = var.cur_bucket_name != "" ? 1 : 0
-  bucket                  = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  count                   = local.create_cur_bucket ? 1 : 0
+  bucket                  = local.cur_bucket_id
   block_public_acls       = true
   block_public_policy     = true
   restrict_public_buckets = true
@@ -303,8 +332,8 @@ resource "aws_s3_bucket_public_access_block" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_policy" "vantage_cost_and_usage_reports" {
-  count  = var.cur_bucket_name != "" ? 1 : 0
-  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  count  = local.manage_cur_bucket_policy ? 1 : 0
+  bucket = local.cur_bucket_id
   policy = data.aws_iam_policy_document.vantage_cur_access[0].json
   depends_on = [
     aws_s3_bucket_public_access_block.vantage_cost_and_usage_reports
@@ -312,8 +341,8 @@ resource "aws_s3_bucket_policy" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_notification" "vantage_cost_and_usage_reports" {
-  count  = var.cur_bucket_name != "" ? 1 : 0
-  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
+  count  = local.manage_cur_bucket_notification ? 1 : 0
+  bucket = local.cur_bucket_id
   topic {
     topic_arn     = local.vantage_sns_topic_arn
     events        = ["s3:ObjectCreated:*"]
@@ -322,10 +351,17 @@ resource "aws_s3_bucket_notification" "vantage_cost_and_usage_reports" {
   depends_on = [
     aws_s3_bucket.vantage_cost_and_usage_reports
   ]
+
+  lifecycle {
+    precondition {
+      condition     = !local.use_existing_cur_bucket || try(data.aws_s3_bucket.existing_cur_bucket[0].region, var.cur_bucket_region) == var.cur_bucket_region
+      error_message = "existing_cur_bucket_name must be in cur_bucket_region so it can notify the Vantage SNS topic in that region."
+    }
+  }
 }
 
 data "aws_iam_policy_document" "vantage_cur_retrieval" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
   statement {
     effect = "Allow"
 
@@ -335,13 +371,15 @@ data "aws_iam_policy_document" "vantage_cur_retrieval" {
     ]
 
     resources = [
-      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
+      "${local.cur_bucket_arn}/*"
     ]
   }
 }
 
 data "aws_iam_policy_document" "vantage_cur_access" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
+
+  source_policy_documents = local.use_existing_cur_bucket ? var.existing_cur_bucket_additional_policy_documents : []
 
   # Legacy CUR reports
   statement {
@@ -355,7 +393,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
       "s3:GetBucketAcl",
       "s3:GetBucketPolicy",
     ]
-    resources = [aws_s3_bucket.vantage_cost_and_usage_reports[0].arn]
+    resources = [local.cur_bucket_arn]
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
@@ -372,7 +410,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     sid       = "S3PutObject"
     effect    = "Allow"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"]
+    resources = ["${local.cur_bucket_arn}/*"]
     principals {
       type        = "Service"
       identifiers = ["billingreports.amazonaws.com"]
@@ -407,8 +445,8 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     ]
 
     resources = [
-      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
-      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
+      local.cur_bucket_arn,
+      "${local.cur_bucket_arn}/*"
     ]
     condition {
       test     = "StringLike"
@@ -438,7 +476,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     }
 
     resources = [
-      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
+      "${local.cur_bucket_arn}/*"
     ]
   }
 
@@ -457,8 +495,8 @@ data "aws_iam_policy_document" "vantage_cur_access" {
       actions = ["s3:*"]
 
       resources = [
-        aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
-        "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*",
+        local.cur_bucket_arn,
+        "${local.cur_bucket_arn}/*",
       ]
 
       condition {
@@ -477,14 +515,14 @@ data "aws_iam_policy_document" "vantage_cur_access" {
 }
 
 resource "vantage_aws_provider" "with_bucket" {
-  count = var.cur_bucket_name != "" ? 1 : 0
+  count = local.cur_bucket_enabled ? 1 : 0
 
   cross_account_arn = aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn
-  bucket_arn        = aws_s3_bucket.vantage_cost_and_usage_reports[0].arn
+  bucket_arn        = local.cur_bucket_arn
 }
 
 resource "vantage_aws_provider" "without_bucket" {
-  count = var.cur_bucket_name != "" ? 0 : 1
+  count = local.cur_bucket_enabled ? 0 : 1
 
   cross_account_arn = aws_iam_role.vantage_cross_account_connection_without_bucket[0].arn
 }

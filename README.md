@@ -87,7 +87,42 @@ remove the `cur_report_additional_schema_elements` input and run
 default. Set `upgrade_to_cur_2 = true` to replace `aws_cur_report_definition`
 with `aws_bcmdataexports_export`.
 
-When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
+### Management AWS Account with an Existing S3 Bucket
+
+To deliver the CUR to an S3 bucket you already manage, set `existing_cur_bucket_name`
+instead of `cur_bucket_name`. The module does not create or delete the bucket and does
+not change its lifecycle rules, ACLs, or public access block. It does manage:
+
+- The bucket policy that allows AWS billing to write reports and the Vantage cross-account role to read them
+- The S3 event notification that sends `.csv.gz` object-created events to the Vantage SNS topic
+- The CUR report or CUR 2.0 data export, unless `cur_report_enabled = false`
+- The cross-account IAM role and Vantage integration
+
+The bucket must be in `cur_bucket_region`, and the AWS provider must use the same region.
+
+```hcl
+module "vantage-integration" {
+  source = "vantage-sh/vantage-integration/aws"
+
+  existing_cur_bucket_name = "my-existing-cur-bucket"
+  cur_bucket_region        = "us-east-1"
+  upgrade_to_cur_2         = true
+
+  # AWS allows only one bucket policy per bucket. Merge in any statements that are
+  # already on the bucket so they are preserved.
+  # existing_cur_bucket_additional_policy_documents = [data.aws_iam_policy_document.existing.json]
+}
+```
+
+> **Warning:** An S3 bucket has a single bucket policy and a single notification
+> configuration. Applying the module **replaces** any existing bucket policy and S3
+> event notifications on the bucket. Use `existing_cur_bucket_additional_policy_documents`
+> to keep existing policy statements. If the bucket already has event notifications,
+> set `existing_cur_bucket_manage_notification = false` and add the Vantage SNS topic
+> to your own `aws_s3_bucket_notification`. You can also set
+> `existing_cur_bucket_manage_policy = false` to manage the policy yourself.
+
+When a CUR bucket is configured, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
 
 ### Member account
 
