@@ -12,14 +12,14 @@ variable "existing_cur_bucket_name" {
 
 variable "existing_cur_bucket_manage_policy" {
   type        = bool
-  description = "Whether to manage the bucket policy on existing_cur_bucket_name. The policy replaces any existing bucket policy; use existing_cur_bucket_additional_policy_documents to retain other statements."
+  description = "Whether to add the Vantage statements to the bucket policy on existing_cur_bucket_name. The current bucket policy is read and merged so its other statements are preserved."
   default     = true
 }
 
-variable "existing_cur_bucket_additional_policy_documents" {
-  type        = list(string)
-  description = "Additional IAM policy documents (JSON) to merge into the bucket policy on existing_cur_bucket_name, so statements already on the bucket are preserved."
-  default     = []
+variable "existing_cur_bucket_has_policy" {
+  type        = bool
+  description = "Whether existing_cur_bucket_name already has a bucket policy to merge with. Set to false for a bucket with no policy, because reading a missing bucket policy fails."
+  default     = true
 }
 
 variable "existing_cur_bucket_manage_notification" {

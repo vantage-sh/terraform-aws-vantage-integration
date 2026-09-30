@@ -19,6 +19,12 @@ mock_provider "aws" {
     }
   }
 
+  mock_data "aws_s3_bucket_policy" {
+    defaults = {
+      policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"CustomerStatement\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::123456789012:root\"},\"Action\":\"s3:ListBucket\",\"Resource\":\"arn:aws:s3:::existing-cur-bucket\"}]}"
+    }
+  }
+
   mock_data "aws_iam_policy_document" {
     defaults = {
       json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
@@ -107,6 +113,11 @@ run "existing_bucket" {
   }
 
   assert {
+    condition     = length(data.aws_s3_bucket_policy.existing_cur_bucket) == 1
+    error_message = "The existing bucket policy should be read so it can be merged."
+  }
+
+  assert {
     condition     = aws_s3_bucket_notification.vantage_cost_and_usage_reports[0].bucket == "existing-cur-bucket"
     error_message = "The S3 event notification should be applied to the existing bucket."
   }
@@ -127,6 +138,20 @@ run "existing_bucket" {
   }
 }
 
+run "existing_bucket_without_a_policy" {
+  command = plan
+
+  variables {
+    existing_cur_bucket_name       = "existing-cur-bucket"
+    existing_cur_bucket_has_policy = false
+  }
+
+  assert {
+    condition     = length(data.aws_s3_bucket_policy.existing_cur_bucket) == 0 && length(aws_s3_bucket_policy.vantage_cost_and_usage_reports) == 1
+    error_message = "A bucket with no policy should get the Vantage policy without reading a current one."
+  }
+}
+
 run "existing_bucket_without_policy_or_notification" {
   command = plan
 
@@ -137,7 +162,7 @@ run "existing_bucket_without_policy_or_notification" {
   }
 
   assert {
-    condition     = length(aws_s3_bucket_policy.vantage_cost_and_usage_reports) == 0 && length(aws_s3_bucket_notification.vantage_cost_and_usage_reports) == 0
+    condition     = length(aws_s3_bucket_policy.vantage_cost_and_usage_reports) == 0 && length(aws_s3_bucket_notification.vantage_cost_and_usage_reports) == 0 && length(data.aws_s3_bucket_policy.existing_cur_bucket) == 0
     error_message = "Bucket policy and notification should be skippable for an existing bucket."
   }
 }

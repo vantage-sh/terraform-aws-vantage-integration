@@ -93,7 +93,7 @@ To deliver the CUR to an S3 bucket you already manage, set `existing_cur_bucket_
 instead of `cur_bucket_name`. The module does not create or delete the bucket and does
 not change its lifecycle rules, ACLs, or public access block. It does manage:
 
-- The bucket policy that allows AWS billing to write reports and the Vantage cross-account role to read them
+- The Vantage statements in the bucket policy, which allow AWS billing to write reports and the Vantage cross-account role to read them
 - The S3 event notification that sends `.csv.gz` object-created events to the Vantage SNS topic
 - The CUR report or CUR 2.0 data export, unless `cur_report_enabled = false`
 - The cross-account IAM role and Vantage integration
@@ -108,19 +108,33 @@ module "vantage-integration" {
   cur_bucket_region        = "us-east-1"
   upgrade_to_cur_2         = true
 
-  # AWS allows only one bucket policy per bucket. Merge in any statements that are
-  # already on the bucket so they are preserved.
-  # existing_cur_bucket_additional_policy_documents = [data.aws_iam_policy_document.existing.json]
+  # Set to false if the bucket has no bucket policy yet.
+  # existing_cur_bucket_has_policy = false
 }
 ```
 
-> **Warning:** An S3 bucket has a single bucket policy and a single notification
-> configuration. Applying the module **replaces** any existing bucket policy and S3
-> event notifications on the bucket. Use `existing_cur_bucket_additional_policy_documents`
-> to keep existing policy statements. If the bucket already has event notifications,
-> set `existing_cur_bucket_manage_notification = false` and add the Vantage SNS topic
-> to your own `aws_s3_bucket_notification`. You can also set
-> `existing_cur_bucket_manage_policy = false` to manage the policy yourself.
+The module reads the bucket's current policy and merges the Vantage statements into
+it, so other statements are preserved. Vantage statements are matched by Sid and
+updated in place on later applies. If the bucket has no policy yet, set
+`existing_cur_bucket_has_policy = false`, because reading a missing bucket policy
+fails. To manage the policy yourself, set `existing_cur_bucket_manage_policy = false`.
+
+> **Warning:** An S3 bucket has a single bucket policy, so Terraform manages the
+> whole merged document:
+>
+> - Removing the module or running `terraform destroy` deletes the **entire** bucket
+>   policy, including statements that were there before. Save a copy of the policy
+>   before destroying so you can restore it.
+> - If you also manage this bucket policy elsewhere in Terraform, the two
+>   configurations will overwrite each other. Set `existing_cur_bucket_manage_policy = false`
+>   and add the Vantage statements to your own policy instead.
+> - Vantage statements that a later module version drops or renames stay in the
+>   bucket policy until you remove them manually.
+>
+> An S3 bucket also has a single notification configuration, and the module
+> **replaces** any existing S3 event notifications. If the bucket already has event
+> notifications, set `existing_cur_bucket_manage_notification = false` and add the
+> Vantage SNS topic to your own `aws_s3_bucket_notification`.
 
 When a CUR bucket is configured, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
 

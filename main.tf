@@ -27,6 +27,11 @@ data "aws_s3_bucket" "existing_cur_bucket" {
   bucket = var.existing_cur_bucket_name
 }
 
+data "aws_s3_bucket_policy" "existing_cur_bucket" {
+  count  = local.use_existing_cur_bucket && var.existing_cur_bucket_manage_policy && var.existing_cur_bucket_has_policy ? 1 : 0
+  bucket = var.existing_cur_bucket_name
+}
+
 locals {
   account_id = data.aws_caller_identity.current.account_id
 
@@ -379,7 +384,9 @@ data "aws_iam_policy_document" "vantage_cur_retrieval" {
 data "aws_iam_policy_document" "vantage_cur_access" {
   count = local.cur_bucket_enabled ? 1 : 0
 
-  source_policy_documents = local.use_existing_cur_bucket ? var.existing_cur_bucket_additional_policy_documents : []
+  # Statements below override same-Sid statements in the existing policy, so every
+  # statement needs a Sid or it is duplicated on each apply.
+  source_policy_documents = data.aws_s3_bucket_policy.existing_cur_bucket[*].policy
 
   # Legacy CUR reports
   statement {
@@ -464,6 +471,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
   }
 
   statement {
+    sid    = "VantageCrossAccountRoleRead"
     effect = "Allow"
 
     actions = [
