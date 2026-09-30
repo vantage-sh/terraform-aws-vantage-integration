@@ -4,9 +4,33 @@ variable "cur_bucket_name" {
   default     = ""
 }
 
+variable "existing_cur_bucket_name" {
+  type        = string
+  description = "The name of an existing S3 bucket to use for the CUR integration instead of provisioning one. The bucket must be in cur_bucket_region. The module does not create, delete, or configure lifecycle/public access settings on this bucket, but it does manage the bucket policy and S3 event notification unless disabled. Cannot be combined with cur_bucket_name."
+  default     = ""
+}
+
+variable "existing_cur_bucket_manage_policy" {
+  type        = bool
+  description = "Whether to add the Vantage statements to the bucket policy on existing_cur_bucket_name. The current bucket policy is read and merged so its other statements are preserved."
+  default     = true
+}
+
+variable "existing_cur_bucket_has_policy" {
+  type        = bool
+  description = "Whether existing_cur_bucket_name already has a bucket policy to merge with. Set to false for a bucket with no policy, because reading a missing bucket policy fails."
+  default     = true
+}
+
+variable "existing_cur_bucket_manage_notification" {
+  type        = bool
+  description = "Whether to manage the S3 event notification to Vantage on existing_cur_bucket_name. The notification configuration replaces any existing S3 event notifications on the bucket."
+  default     = true
+}
+
 variable "cur_bucket_region" {
   type        = string
-  description = "The supported AWS region where the CUR bucket will be created. The AWS provider must use the same region."
+  description = "The supported AWS region where the CUR bucket will be created, or where existing_cur_bucket_name is located. The AWS provider must use the same region."
   default     = "us-east-1"
 
   validation {
