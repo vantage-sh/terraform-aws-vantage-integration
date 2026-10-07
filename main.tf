@@ -116,18 +116,7 @@ data "aws_iam_policy_document" "vantage_assume_role" {
   }
 }
 
-resource "aws_iam_role" "vantage_cross_account_connection_with_bucket" {
-  count = local.cur_bucket_enabled ? 1 : 0
-
-  name                 = "vantage_cross_account_connection"
-  assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
-  permissions_boundary = var.permissions_boundary_arn
-
-  tags = var.tags
-}
-
-resource "aws_iam_role" "vantage_cross_account_connection_without_bucket" {
-  count                = local.cur_bucket_enabled ? 0 : 1
+resource "aws_iam_role" "vantage_cross_account_connection" {
   name                 = "vantage_cross_account_connection"
   assume_role_policy   = data.aws_iam_policy_document.vantage_assume_role.json
   permissions_boundary = var.permissions_boundary_arn
@@ -139,99 +128,46 @@ resource "aws_iam_role_policy" "vantage_cur_retrieval" {
   count = local.cur_bucket_enabled ? 1 : 0
 
   name   = "VantageCostandUsageReportRetrieval"
-  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  role   = aws_iam_role.vantage_cross_account_connection.name
   policy = data.aws_iam_policy_document.vantage_cur_retrieval[0].json
 }
 
-resource "aws_iam_role_policy" "vantage_root_with_bucket" {
-  count = local.cur_bucket_enabled ? 1 : 0
-
+resource "aws_iam_role_policy" "vantage_root" {
   name   = "root"
-  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  role   = aws_iam_role.vantage_cross_account_connection.name
   policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
 }
 
-resource "aws_iam_role_policy" "vantage_root_without_bucket" {
-  count = local.cur_bucket_enabled ? 0 : 1
-
-  name   = "root"
-  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
-  policy = var.vantage_root_iam_policy_override != null ? var.vantage_root_iam_policy_override : data.vantage_aws_provider_info.default.root_policy
-}
-
-resource "aws_iam_role_policy" "vantage_autopilot_with_bucket" {
-  count = local.cur_bucket_enabled && var.enable_autopilot ? 1 : 0
+resource "aws_iam_role_policy" "vantage_autopilot" {
+  count = var.enable_autopilot ? 1 : 0
 
   name   = "VantageAutoPilot"
-  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  role   = aws_iam_role.vantage_cross_account_connection.name
   policy = data.vantage_aws_provider_info.default.autopilot_policy
 }
 
-resource "aws_iam_role_policy" "vantage_autopilot_without_bucket" {
-  count = !local.cur_bucket_enabled && var.enable_autopilot ? 1 : 0
-
-  name   = "VantageAutoPilot"
-  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
-  policy = data.vantage_aws_provider_info.default.autopilot_policy
-}
-
-resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_with_bucket" {
-  count = local.cur_bucket_enabled ? 1 : 0
-
+resource "aws_iam_role_policy" "vantage_cloudwatch_metrics" {
   name   = "VantageCloudWatchMetricsReadOnly"
-  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  role   = aws_iam_role.vantage_cross_account_connection.name
   policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
 }
 
-resource "aws_iam_role_policy" "vantage_cloudwatch_metrics_without_bucket" {
-  count = local.cur_bucket_enabled ? 0 : 1
-
-  name   = "VantageCloudWatchMetricsReadOnly"
-  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
-  policy = var.vantage_cloudwatch_metrics_iam_policy_override != null ? var.vantage_cloudwatch_metrics_iam_policy_override : data.vantage_aws_provider_info.default.cloudwatch_metrics_policy
-}
-
-resource "aws_iam_role_policy" "vantage_additional_resources_with_bucket" {
-  count = local.cur_bucket_enabled ? 1 : 0
-
+resource "aws_iam_role_policy" "vantage_additional_resources" {
   name   = "VantageAdditionalResourceReadOnly"
-  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  role   = aws_iam_role.vantage_cross_account_connection.name
   policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
 }
 
-resource "aws_iam_role_policy" "vantage_additional_resources_without_bucket" {
-  count = local.cur_bucket_enabled ? 0 : 1
-
-  name   = "VantageAdditionalResourceReadOnly"
-  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
-  policy = var.vantage_additional_resources_iam_policy_override != null ? var.vantage_additional_resources_iam_policy_override : data.vantage_aws_provider_info.default.additional_resources_policy
-}
-
-resource "aws_iam_role_policy" "additional_inline_policies_with_bucket" {
-  for_each = local.cur_bucket_enabled ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
+resource "aws_iam_role_policy" "additional_inline_policies" {
+  for_each = { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy }
 
   name   = each.value["name"]
-  role   = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
+  role   = aws_iam_role.vantage_cross_account_connection.name
   policy = each.value["policy"]
 }
 
-resource "aws_iam_role_policy" "additional_inline_policies_without_bucket" {
-  for_each = !local.cur_bucket_enabled ? { for additional_policy in var.additional_inline_policies : additional_policy["name"] => additional_policy } : {}
-
-  name   = each.value["name"]
-  role   = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
-  policy = each.value["policy"]
-}
-
-resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with_bucket" {
-  count      = local.cur_bucket_enabled ? 1 : 0
-  role       = aws_iam_role.vantage_cross_account_connection_with_bucket[0].name
-  policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
-}
-
-resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_without_bucket" {
-  count      = local.cur_bucket_enabled ? 0 : 1
-  role       = aws_iam_role.vantage_cross_account_connection_without_bucket[0].name
+resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection" {
+  role       = aws_iam_role.vantage_cross_account_connection.name
   policy_arn = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
 }
 
@@ -553,7 +489,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     ]
     principals {
       type        = "AWS"
-      identifiers = [aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn]
+      identifiers = [aws_iam_role.vantage_cross_account_connection.arn]
     }
 
     resources = [
@@ -703,7 +639,7 @@ data "aws_iam_policy_document" "existing_cur_bucket" {
     ]
     principals {
       type        = "AWS"
-      identifiers = [aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn]
+      identifiers = [aws_iam_role.vantage_cross_account_connection.arn]
     }
 
     resources = [
@@ -751,15 +687,7 @@ resource "aws_s3_bucket_policy" "existing_cur_bucket" {
   policy = data.aws_iam_policy_document.existing_cur_bucket[0].json
 }
 
-resource "vantage_aws_provider" "with_bucket" {
-  count = local.cur_bucket_enabled ? 1 : 0
-
-  cross_account_arn = aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn
+resource "vantage_aws_provider" "this" {
+  cross_account_arn = aws_iam_role.vantage_cross_account_connection.arn
   bucket_arn        = local.cur_bucket_arn
-}
-
-resource "vantage_aws_provider" "without_bucket" {
-  count = local.cur_bucket_enabled ? 0 : 1
-
-  cross_account_arn = aws_iam_role.vantage_cross_account_connection_without_bucket[0].arn
 }

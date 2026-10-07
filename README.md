@@ -4,6 +4,40 @@ This module handles linking an AWS account with your Vantage account. For manage
 
 > **Before you begin:** A Vantage API token with **Write** scope, assigned to the **Everyone** team, is required. See [the Vantage documentation](https://docs.vantage.sh/api/authentication) for information on how to create a token. Set the `VANTAGE_API_TOKEN` environment variable (or configure the provider’s `api_token`) before running Terraform. This module requires version 5.48.0 or newer of the HashiCorp AWS provider.
 
+## Upgrading
+
+### Single cross-account role
+
+The module used to create one of two mutually exclusive IAM role addresses (`*_with_bucket` or `*_without_bucket`) and mirrored that split for several policies and the Vantage provider. Those are now single resources. Terraform cannot move both old addresses onto one new address, so the next plan shows **destroy then create** for the addresses below.
+
+The AWS IAM role name (`vantage_cross_account_connection`) and ARN stay the same. Expect a short recreate of that role, its inline policies, the `ViewOnlyAccess` attachment, and the `vantage_aws_provider` resource—not a new role name or a different ARN. Other resources that depend on the role (for example `aws_iam_role_policy.vantage_cur_retrieval[0]` when a CUR bucket is enabled) may also be replaced in the same apply even when their addresses did not rename.
+
+**CUR bucket path** (`cur_bucket_name` or `existing_cur_bucket_name` set):
+
+| Destroy | Create |
+| --- | --- |
+| `aws_iam_role.vantage_cross_account_connection_with_bucket[0]` | `aws_iam_role.vantage_cross_account_connection` |
+| `aws_iam_role_policy.vantage_root_with_bucket[0]` | `aws_iam_role_policy.vantage_root` |
+| `aws_iam_role_policy.vantage_cloudwatch_metrics_with_bucket[0]` | `aws_iam_role_policy.vantage_cloudwatch_metrics` |
+| `aws_iam_role_policy.vantage_additional_resources_with_bucket[0]` | `aws_iam_role_policy.vantage_additional_resources` |
+| `aws_iam_role_policy_attachment.vantage_cross_account_connection_with_bucket[0]` | `aws_iam_role_policy_attachment.vantage_cross_account_connection` |
+| `vantage_aws_provider.with_bucket[0]` | `vantage_aws_provider.this` |
+| `aws_iam_role_policy.vantage_autopilot_with_bucket[0]` (if `enable_autopilot`) | `aws_iam_role_policy.vantage_autopilot[0]` |
+| `aws_iam_role_policy.additional_inline_policies_with_bucket["<name>"]` (each entry) | `aws_iam_role_policy.additional_inline_policies["<name>"]` |
+
+**Member account path** (no CUR bucket):
+
+| Destroy | Create |
+| --- | --- |
+| `aws_iam_role.vantage_cross_account_connection_without_bucket[0]` | `aws_iam_role.vantage_cross_account_connection` |
+| `aws_iam_role_policy.vantage_root_without_bucket[0]` | `aws_iam_role_policy.vantage_root` |
+| `aws_iam_role_policy.vantage_cloudwatch_metrics_without_bucket[0]` | `aws_iam_role_policy.vantage_cloudwatch_metrics` |
+| `aws_iam_role_policy.vantage_additional_resources_without_bucket[0]` | `aws_iam_role_policy.vantage_additional_resources` |
+| `aws_iam_role_policy_attachment.vantage_cross_account_connection_without_bucket[0]` | `aws_iam_role_policy_attachment.vantage_cross_account_connection` |
+| `vantage_aws_provider.without_bucket[0]` | `vantage_aws_provider.this` |
+| `aws_iam_role_policy.vantage_autopilot_without_bucket[0]` (if `enable_autopilot`) | `aws_iam_role_policy.vantage_autopilot[0]` |
+| `aws_iam_role_policy.additional_inline_policies_without_bucket["<name>"]` (each entry) | `aws_iam_role_policy.additional_inline_policies["<name>"]` |
+
 ## Usage
 
 This module configures an AWS account integration on Vantage. By default, it does not configure a CUR integration. If the account is your management AWS account and you want to configure a CUR integration, use the `cur_bucket_name` variable. The bucket name is used for a private S3 bucket and must be globally unique.

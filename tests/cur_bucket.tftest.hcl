@@ -68,7 +68,7 @@ run "member_account" {
   }
 
   assert {
-    condition     = length(aws_iam_role.vantage_cross_account_connection_without_bucket) == 1 && length(vantage_aws_provider.without_bucket) == 1
+    condition     = aws_iam_role.vantage_cross_account_connection.name == "vantage_cross_account_connection" && vantage_aws_provider.this.bucket_arn == null
     error_message = "A member account should get the cross-account role and integration without a bucket."
   }
 
@@ -113,7 +113,7 @@ run "created_bucket" {
   }
 
   assert {
-    condition     = vantage_aws_provider.with_bucket[0].bucket_arn == "arn:aws:s3:::created-cur-bucket"
+    condition     = vantage_aws_provider.this.bucket_arn == "arn:aws:s3:::created-cur-bucket"
     error_message = "The integration should reference the created bucket."
   }
 }
@@ -162,7 +162,7 @@ run "existing_bucket_with_report" {
   }
 
   assert {
-    condition     = vantage_aws_provider.with_bucket[0].bucket_arn == "arn:aws:s3:::existing-cur-bucket" && output.vantage_cost_and_usage_reports_bucket_id == "existing-cur-bucket"
+    condition     = vantage_aws_provider.this.bucket_arn == "arn:aws:s3:::existing-cur-bucket" && output.vantage_cost_and_usage_reports_bucket_id == "existing-cur-bucket"
     error_message = "The integration and bucket output should reference the existing bucket."
   }
 }
@@ -369,7 +369,7 @@ run "opt_out_policy_and_notification" {
   }
 
   assert {
-    condition     = length(aws_iam_role.vantage_cross_account_connection_with_bucket) == 1 && length(vantage_aws_provider.with_bucket) == 1
+    condition     = aws_iam_role.vantage_cross_account_connection.name == "vantage_cross_account_connection" && vantage_aws_provider.this.bucket_arn == "arn:aws:s3:::existing-cur-bucket"
     error_message = "Opting out of the policy and notification should still create the role and integration."
   }
 }
