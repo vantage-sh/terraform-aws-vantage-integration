@@ -50,10 +50,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
+      # Tests use run.state_key (Terraform >= 1.11). The module itself still
+      # declares required_version >= 1.9.0 for consumers.
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4.0.1
         with:
-          terraform_version: "1.9.0"
+          terraform_version: "1.11.0"
           terraform_wrapper: false
 
       - name: Terraform Init
