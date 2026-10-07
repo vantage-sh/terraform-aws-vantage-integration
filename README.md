@@ -87,56 +87,56 @@ remove the `cur_report_additional_schema_elements` input and run
 default. Set `upgrade_to_cur_2 = true` to replace `aws_cur_report_definition`
 with `aws_bcmdataexports_export`.
 
-### Management AWS Account with an Existing S3 Bucket
+When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by default (`enforce_https_only` defaults to `true` for a bucket this module creates). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
 
-To deliver the CUR to an S3 bucket you already manage, set `existing_cur_bucket_name`
-instead of `cur_bucket_name`. The module does not create or delete the bucket and does
-not change its lifecycle rules, ACLs, or public access block. It does manage:
+### Existing S3 bucket
 
-- The Vantage statements in the bucket policy, which allow AWS billing to write reports and the Vantage cross-account role to read them
-- The S3 event notification that sends `.csv.gz` object-created events to the Vantage SNS topic
-- The CUR report or CUR 2.0 data export, unless `cur_report_enabled = false`
-- The cross-account IAM role and Vantage integration
+Use `existing_cur_bucket_name` instead of `cur_bucket_name` when the bucket already exists. The module looks the bucket up with a data source. It does not create or delete the bucket, and it does not change the bucket's lifecycle rules, ACL, or public access block. It manages the CUR report or CUR 2.0 export (unless `cur_report_enabled = false`), the cross-account role, the Vantage integration, and by default the bucket policy and S3 event notification.
 
-The bucket must be in `cur_bucket_region`, and the AWS provider must use the same region.
+The bucket must be in `cur_bucket_region`, and the AWS provider must use that same region. The bucket lookup fails when the bucket is in a different region, whether or not the module manages the notification. Setting both `cur_bucket_name` and `existing_cur_bucket_name` fails at plan time.
 
 ```hcl
 module "vantage-integration" {
   source = "vantage-sh/vantage-integration/aws"
 
-  existing_cur_bucket_name = "my-existing-cur-bucket"
+  existing_cur_bucket_name = "company-cur-bucket"
   cur_bucket_region        = "us-east-1"
   upgrade_to_cur_2         = true
-
-  # Set to false if the bucket has no bucket policy yet.
-  # existing_cur_bucket_has_policy = false
 }
 ```
 
-The module reads the bucket's current policy and merges the Vantage statements into
-it, so other statements are preserved. Vantage statements are matched by Sid and
-updated in place on later applies. If the bucket has no policy yet, set
-`existing_cur_bucket_has_policy = false`, because reading a missing bucket policy
-fails. To manage the policy yourself, set `existing_cur_bucket_manage_policy = false`.
+`cur_report_s3_prefix` defaults to `<time unit>-v1` (for example `daily-v1`), which is the prefix this module has always used. On an existing bucket, the Vantage notification filter and the role's `s3:GetObject` access are limited to that prefix. Set `cur_report_enabled = false` when you already manage the report. If you do that and leave the prefix unset, the notification and `s3:GetObject` access cover the whole bucket.
 
-> **Warning:** An S3 bucket has a single bucket policy, so Terraform manages the
-> whole merged document:
->
-> - Removing the module or running `terraform destroy` deletes the **entire** bucket
->   policy, including statements that were there before. Save a copy of the policy
->   before destroying so you can restore it.
-> - If you also manage this bucket policy elsewhere in Terraform, the two
->   configurations will overwrite each other. Set `existing_cur_bucket_manage_policy = false`
->   and add the Vantage statements to your own policy instead.
-> - Vantage statements that a later module version drops or renames stay in the
->   bucket policy until you remove them manually.
->
-> An S3 bucket also has a single notification configuration, and the module
-> **replaces** any existing S3 event notifications. If the bucket already has event
-> notifications, set `existing_cur_bucket_manage_notification = false` and add the
-> Vantage SNS topic to your own `aws_s3_bucket_notification`.
+```hcl
+module "vantage-integration" {
+  source = "vantage-sh/vantage-integration/aws"
 
-When a CUR bucket is configured, the bucket policy denies plain-HTTP access by default (`enforce_https_only = true`). AWS billing report delivery is exempt via `aws:PrincipalIsAWSService`. Set `enforce_https_only = false` in the module block to disable the deny statement.
+  existing_cur_bucket_name = "company-cur-bucket"
+  cur_bucket_region        = "us-east-1"
+  cur_report_enabled       = false
+  # Optional. Omit to cover the whole bucket.
+  cur_report_s3_prefix = "cur/vantage"
+}
+```
+
+#### Bucket policy
+
+The module replaces the bucket policy, matching the existing-bucket CloudFormation template. It manages that policy by default only when it creates the CUR report, because AWS billing needs the policy to write report files. With `cur_report_enabled = false` the policy is left alone: the Vantage role is in the same account and reads reports through its IAM policy.
+
+Pass statements to keep in `existing_cur_bucket_policy_json`. They are merged into the managed policy, and Vantage statements override statements with the same Sid. Set `existing_cur_bucket_manage_policy` to `true` or `false` to override the default.
+
+`enforce_https_only` defaults to `false` for an existing bucket. The plain-HTTP deny applies to every client of the bucket. Set `enforce_https_only = true` to add it.
+
+For an SSE-KMS bucket, set `existing_cur_bucket_kms_key_arn` so the role is allowed `kms:Decrypt` on that key.
+
+#### S3 event notification
+
+S3 allows one notification configuration per bucket, so the module replaces it with the Vantage topic. Keep other destinations with `existing_cur_bucket_additional_notifications` (SNS topics, SQS queues, and Lambda functions). Set `existing_cur_bucket_notification_eventbridge = true` to keep EventBridge enabled. Otherwise the managed configuration turns EventBridge off. Set `existing_cur_bucket_manage_notification = false` to skip the notification entirely.
+
+#### Limits
+
+- `terraform destroy`, or removing this module, deletes the bucket policy and the notification configuration when the module manages them. That includes statements and notifications passed in to keep. The bucket itself is not deleted.
+- An explicit `Deny` in a bucket policy this module does not manage can still block the Vantage role. The role's IAM policy is not enough when the bucket policy denies it.
 
 ### Member account
 

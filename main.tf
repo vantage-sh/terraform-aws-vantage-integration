@@ -16,20 +16,38 @@ data "aws_caller_identity" "current" {
   lifecycle {
     precondition {
       condition     = var.cur_bucket_name == "" || var.existing_cur_bucket_name == ""
-      error_message = "Only one of cur_bucket_name or existing_cur_bucket_name can be set."
+      error_message = "Set cur_bucket_name to create a CUR bucket or existing_cur_bucket_name to use a bucket you already have, not both."
+    }
+
+    precondition {
+      condition     = var.existing_cur_bucket_kms_key_arn == null || var.existing_cur_bucket_name != ""
+      error_message = "existing_cur_bucket_kms_key_arn requires existing_cur_bucket_name."
+    }
+
+    precondition {
+      condition = var.existing_cur_bucket_policy_json == null || (
+        var.existing_cur_bucket_name != "" && (
+          var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : var.cur_report_enabled
+        )
+      )
+      error_message = "existing_cur_bucket_policy_json is only applied when the module manages the policy on existing_cur_bucket_name. Set existing_cur_bucket_manage_policy to true."
     }
   }
 }
 data "aws_partition" "current" {}
 
+# bucket_regional_domain_name is the bucket's real region on AWS provider v5 and v6.
+# v6 reused the region attribute for the provider region.
 data "aws_s3_bucket" "existing_cur_bucket" {
   count  = local.use_existing_cur_bucket ? 1 : 0
   bucket = var.existing_cur_bucket_name
-}
 
-data "aws_s3_bucket_policy" "existing_cur_bucket" {
-  count  = local.use_existing_cur_bucket && var.existing_cur_bucket_manage_policy && var.existing_cur_bucket_has_policy ? 1 : 0
-  bucket = var.existing_cur_bucket_name
+  lifecycle {
+    postcondition {
+      condition     = endswith(self.bucket_regional_domain_name, ".s3.${var.cur_bucket_region}.amazonaws.com")
+      error_message = "S3 bucket ${var.existing_cur_bucket_name} is not in ${var.cur_bucket_region}. cur_bucket_region must be the bucket's region, and the AWS provider region must match. This check runs even when the module does not manage the bucket notification."
+    }
+  }
 }
 
 locals {
@@ -38,11 +56,28 @@ locals {
   create_cur_bucket       = var.cur_bucket_name != ""
   use_existing_cur_bucket = var.existing_cur_bucket_name != ""
   cur_bucket_enabled      = local.create_cur_bucket || local.use_existing_cur_bucket
-  manage_cur_bucket_policy = local.create_cur_bucket || (
-    local.use_existing_cur_bucket && var.existing_cur_bucket_manage_policy
+
+  # Null means: manage the policy when this module creates the report, because AWS
+  # billing needs a bucket policy to write. A self-managed report leaves the policy alone.
+  manage_existing_cur_bucket_policy = local.use_existing_cur_bucket && (
+    var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : var.cur_report_enabled
   )
-  manage_cur_bucket_notification = local.create_cur_bucket || (
-    local.use_existing_cur_bucket && var.existing_cur_bucket_manage_notification
+  manage_existing_cur_bucket_notification = local.use_existing_cur_bucket && var.existing_cur_bucket_manage_notification
+
+  # True for a bucket this module creates. False for an existing bucket, where the
+  # deny would apply to every client of that bucket.
+  enforce_https_only = var.enforce_https_only != null ? var.enforce_https_only : local.create_cur_bucket
+
+  # Include billing write statements for module-created buckets, and for an existing
+  # bucket only when this module creates the report. A forced policy on a self-managed
+  # report matches the existing-bucket CloudFormation template: the cross-account read
+  # statement only.
+  include_cur_billing_policy_statements = local.create_cur_bucket || (local.use_existing_cur_bucket && var.cur_report_enabled)
+
+  cur_report_s3_prefix = var.cur_report_s3_prefix != null ? var.cur_report_s3_prefix : "${lower(var.cur_report_time_unit)}-v1"
+  # Unset prefix on a self-managed report covers the whole existing bucket.
+  existing_cur_object_prefix = var.cur_report_s3_prefix != null ? var.cur_report_s3_prefix : (
+    var.cur_report_enabled ? local.cur_report_s3_prefix : ""
   )
 
   cur_bucket_id = local.create_cur_bucket ? aws_s3_bucket.vantage_cost_and_usage_reports[0].id : (
@@ -51,6 +86,14 @@ locals {
   cur_bucket_arn = local.create_cur_bucket ? aws_s3_bucket.vantage_cost_and_usage_reports[0].arn : (
     local.use_existing_cur_bucket ? data.aws_s3_bucket.existing_cur_bucket[0].arn : null
   )
+  cur_object_arn = local.cur_bucket_arn == null ? null : (
+    local.use_existing_cur_bucket && local.existing_cur_object_prefix != "" ? "${local.cur_bucket_arn}/${local.existing_cur_object_prefix}/*" : "${local.cur_bucket_arn}/*"
+  )
+
+  additional_cur_notification_topics  = coalesce(try(var.existing_cur_bucket_additional_notifications.topics, null), [])
+  additional_cur_notification_queues  = coalesce(try(var.existing_cur_bucket_additional_notifications.queues, null), [])
+  additional_cur_notification_lambdas = coalesce(try(var.existing_cur_bucket_additional_notifications.lambda_functions, null), [])
+
   vantage_sns_topic_arns = {
     ap-southeast-1 = "arn:aws:sns:ap-southeast-1:630399649041:cost-and-usage-report-uploaded"
     eu-west-1      = "arn:aws:sns:eu-west-1:630399649041:cost-and-usage-report-uploaded"
@@ -223,12 +266,13 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
   additional_schema_elements = ["RESOURCES"]
   s3_bucket                  = local.cur_bucket_id
   s3_region                  = var.cur_bucket_region
-  s3_prefix                  = "${lower(var.cur_report_time_unit)}-v1"
+  s3_prefix                  = local.cur_report_s3_prefix
   report_versioning          = "OVERWRITE_REPORT"
   refresh_closed_reports     = true
 
   depends_on = [
-    aws_s3_bucket_policy.vantage_cost_and_usage_reports
+    aws_s3_bucket_policy.vantage_cost_and_usage_reports,
+    aws_s3_bucket_policy.existing_cur_bucket,
   ]
 }
 
@@ -256,7 +300,7 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
     destination_configurations {
       s3_destination {
         s3_bucket = local.cur_bucket_id
-        s3_prefix = "${lower(var.cur_report_time_unit)}-v1"
+        s3_prefix = local.cur_report_s3_prefix
         s3_region = var.cur_bucket_region
 
         s3_output_configurations {
@@ -274,7 +318,8 @@ resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
   }
 
   depends_on = [
-    aws_s3_bucket_policy.vantage_cost_and_usage_reports
+    aws_s3_bucket_policy.vantage_cost_and_usage_reports,
+    aws_s3_bucket_policy.existing_cur_bucket,
   ]
 }
 
@@ -337,8 +382,8 @@ resource "aws_s3_bucket_public_access_block" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_policy" "vantage_cost_and_usage_reports" {
-  count  = local.manage_cur_bucket_policy ? 1 : 0
-  bucket = local.cur_bucket_id
+  count  = local.create_cur_bucket ? 1 : 0
+  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
   policy = data.aws_iam_policy_document.vantage_cur_access[0].json
   depends_on = [
     aws_s3_bucket_public_access_block.vantage_cost_and_usage_reports
@@ -346,8 +391,8 @@ resource "aws_s3_bucket_policy" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_s3_bucket_notification" "vantage_cost_and_usage_reports" {
-  count  = local.manage_cur_bucket_notification ? 1 : 0
-  bucket = local.cur_bucket_id
+  count  = local.create_cur_bucket ? 1 : 0
+  bucket = aws_s3_bucket.vantage_cost_and_usage_reports[0].id
   topic {
     topic_arn     = local.vantage_sns_topic_arn
     events        = ["s3:ObjectCreated:*"]
@@ -356,11 +401,53 @@ resource "aws_s3_bucket_notification" "vantage_cost_and_usage_reports" {
   depends_on = [
     aws_s3_bucket.vantage_cost_and_usage_reports
   ]
+}
 
-  lifecycle {
-    precondition {
-      condition     = !local.use_existing_cur_bucket || try(data.aws_s3_bucket.existing_cur_bucket[0].region, var.cur_bucket_region) == var.cur_bucket_region
-      error_message = "existing_cur_bucket_name must be in cur_bucket_region so it can notify the Vantage SNS topic in that region."
+resource "aws_s3_bucket_notification" "existing_cur_bucket" {
+  count       = local.manage_existing_cur_bucket_notification ? 1 : 0
+  bucket      = data.aws_s3_bucket.existing_cur_bucket[0].id
+  eventbridge = var.existing_cur_bucket_notification_eventbridge
+
+  topic {
+    topic_arn     = local.vantage_sns_topic_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = local.existing_cur_object_prefix != "" ? "${local.existing_cur_object_prefix}/" : null
+    filter_suffix = ".csv.gz"
+  }
+
+  dynamic "topic" {
+    for_each = local.additional_cur_notification_topics
+
+    content {
+      id            = topic.value.id
+      topic_arn     = topic.value.topic_arn
+      events        = topic.value.events
+      filter_prefix = topic.value.filter_prefix
+      filter_suffix = topic.value.filter_suffix
+    }
+  }
+
+  dynamic "queue" {
+    for_each = local.additional_cur_notification_queues
+
+    content {
+      id            = queue.value.id
+      queue_arn     = queue.value.queue_arn
+      events        = queue.value.events
+      filter_prefix = queue.value.filter_prefix
+      filter_suffix = queue.value.filter_suffix
+    }
+  }
+
+  dynamic "lambda_function" {
+    for_each = local.additional_cur_notification_lambdas
+
+    content {
+      id                  = lambda_function.value.id
+      lambda_function_arn = lambda_function.value.lambda_function_arn
+      events              = lambda_function.value.events
+      filter_prefix       = lambda_function.value.filter_prefix
+      filter_suffix       = lambda_function.value.filter_suffix
     }
   }
 }
@@ -376,17 +463,25 @@ data "aws_iam_policy_document" "vantage_cur_retrieval" {
     ]
 
     resources = [
-      "${local.cur_bucket_arn}/*"
+      local.cur_object_arn
     ]
+  }
+
+  dynamic "statement" {
+    for_each = local.use_existing_cur_bucket && var.existing_cur_bucket_kms_key_arn != null ? [var.existing_cur_bucket_kms_key_arn] : []
+
+    content {
+      effect = "Allow"
+      actions = [
+        "kms:Decrypt"
+      ]
+      resources = [statement.value]
+    }
   }
 }
 
 data "aws_iam_policy_document" "vantage_cur_access" {
-  count = local.cur_bucket_enabled ? 1 : 0
-
-  # Statements below override same-Sid statements in the existing policy, so every
-  # statement needs a Sid or it is duplicated on each apply.
-  source_policy_documents = data.aws_s3_bucket_policy.existing_cur_bucket[*].policy
+  count = local.create_cur_bucket ? 1 : 0
 
   # Legacy CUR reports
   statement {
@@ -400,7 +495,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
       "s3:GetBucketAcl",
       "s3:GetBucketPolicy",
     ]
-    resources = [local.cur_bucket_arn]
+    resources = [aws_s3_bucket.vantage_cost_and_usage_reports[0].arn]
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
@@ -417,7 +512,7 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     sid       = "S3PutObject"
     effect    = "Allow"
     actions   = ["s3:PutObject"]
-    resources = ["${local.cur_bucket_arn}/*"]
+    resources = ["${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"]
     principals {
       type        = "Service"
       identifiers = ["billingreports.amazonaws.com"]
@@ -452,8 +547,8 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     ]
 
     resources = [
-      local.cur_bucket_arn,
-      "${local.cur_bucket_arn}/*"
+      aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
+      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
     ]
     condition {
       test     = "StringLike"
@@ -484,12 +579,162 @@ data "aws_iam_policy_document" "vantage_cur_access" {
     }
 
     resources = [
-      "${local.cur_bucket_arn}/*"
+      "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*"
     ]
   }
 
   dynamic "statement" {
-    for_each = var.enforce_https_only ? [1] : []
+    for_each = local.enforce_https_only ? [1] : []
+
+    content {
+      sid    = "AllowSSLRequestsOnly"
+      effect = "Deny"
+
+      principals {
+        type        = "*"
+        identifiers = ["*"]
+      }
+
+      actions = ["s3:*"]
+
+      resources = [
+        aws_s3_bucket.vantage_cost_and_usage_reports[0].arn,
+        "${aws_s3_bucket.vantage_cost_and_usage_reports[0].arn}/*",
+      ]
+
+      condition {
+        test     = "Bool"
+        variable = "aws:SecureTransport"
+        values   = ["false"]
+      }
+
+      condition {
+        test     = "BoolIfExists"
+        variable = "aws:PrincipalIsAWSService"
+        values   = ["false"]
+      }
+    }
+  }
+}
+
+data "aws_iam_policy_document" "existing_cur_bucket" {
+  count = local.manage_existing_cur_bucket_policy ? 1 : 0
+
+  # Kept statements are merged in. Vantage statement blocks override the same Sid.
+  source_policy_documents = var.existing_cur_bucket_policy_json != null ? [var.existing_cur_bucket_policy_json] : []
+
+  dynamic "statement" {
+    for_each = local.include_cur_billing_policy_statements ? [1] : []
+
+    content {
+      sid    = "S3BucketPermissionsRetrieval"
+      effect = "Allow"
+      principals {
+        type        = "Service"
+        identifiers = ["billingreports.amazonaws.com"]
+      }
+      actions = [
+        "s3:GetBucketAcl",
+        "s3:GetBucketPolicy",
+      ]
+      resources = [local.cur_bucket_arn]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceArn"
+        values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
+      }
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [local.account_id]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.include_cur_billing_policy_statements ? [1] : []
+
+    content {
+      sid       = "S3PutObject"
+      effect    = "Allow"
+      actions   = ["s3:PutObject"]
+      resources = ["${local.cur_bucket_arn}/*"]
+      principals {
+        type        = "Service"
+        identifiers = ["billingreports.amazonaws.com"]
+      }
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceArn"
+        values   = ["arn:aws:cur:us-east-1:${local.account_id}:definition/*"]
+      }
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [local.account_id]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.include_cur_billing_policy_statements ? [1] : []
+
+    content {
+      sid    = "EnableAWSDataExportsToWriteToS3AndCheckPolicy"
+      effect = "Allow"
+
+      principals {
+        type = "Service"
+        identifiers = [
+          "bcm-data-exports.amazonaws.com",
+          "billingreports.amazonaws.com"
+        ]
+      }
+      actions = [
+        "s3:PutObject",
+        "s3:GetBucketPolicy"
+      ]
+
+      resources = [
+        local.cur_bucket_arn,
+        "${local.cur_bucket_arn}/*"
+      ]
+      condition {
+        test     = "StringLike"
+        variable = "aws:SourceArn"
+        values = [
+          "arn:aws:cur:us-east-1:${local.account_id}:definition/*",
+          "arn:aws:bcm-data-exports:us-east-1:${local.account_id}:export/*"
+        ]
+      }
+      condition {
+        test     = "StringLike"
+        variable = "aws:SourceAccount"
+        values   = [local.account_id]
+      }
+    }
+  }
+
+  statement {
+    sid    = "VantageCrossAccountRoleRead"
+    effect = "Allow"
+
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectAcl"
+    ]
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn]
+    }
+
+    resources = [
+      local.cur_object_arn
+    ]
+  }
+
+  dynamic "statement" {
+    for_each = local.enforce_https_only ? [1] : []
 
     content {
       sid    = "AllowSSLRequestsOnly"
@@ -520,6 +765,12 @@ data "aws_iam_policy_document" "vantage_cur_access" {
       }
     }
   }
+}
+
+resource "aws_s3_bucket_policy" "existing_cur_bucket" {
+  count  = local.manage_existing_cur_bucket_policy ? 1 : 0
+  bucket = data.aws_s3_bucket.existing_cur_bucket[0].id
+  policy = data.aws_iam_policy_document.existing_cur_bucket[0].json
 }
 
 resource "vantage_aws_provider" "with_bucket" {

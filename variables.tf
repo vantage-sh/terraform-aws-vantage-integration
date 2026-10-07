@@ -1,31 +1,87 @@
 variable "cur_bucket_name" {
   type        = string
-  description = "The S3 bucket name to provision for CUR integration. This module assumes the bucket does not already exist and will setup the bucket, CUR integration with the bucket, and access for the cross account role."
+  description = "The S3 bucket name to provision for CUR integration. This module assumes the bucket does not already exist and will setup the bucket, CUR integration with the bucket, and access for the cross account role. Cannot be combined with existing_cur_bucket_name."
   default     = ""
 }
 
 variable "existing_cur_bucket_name" {
   type        = string
-  description = "The name of an existing S3 bucket to use for the CUR integration instead of provisioning one. The bucket must be in cur_bucket_region. The module does not create, delete, or configure lifecycle/public access settings on this bucket, but it does manage the bucket policy and S3 event notification unless disabled. Cannot be combined with cur_bucket_name."
+  description = "Name of an S3 bucket that already exists, used instead of cur_bucket_name. The module looks the bucket up and does not create or delete it, or change its lifecycle rules, ACL, or public access block. The bucket must be in cur_bucket_region. Cannot be combined with cur_bucket_name."
   default     = ""
 }
 
 variable "existing_cur_bucket_manage_policy" {
   type        = bool
-  description = "Whether to add the Vantage statements to the bucket policy on existing_cur_bucket_name. The current bucket policy is read and merged so its other statements are preserved."
-  default     = true
+  description = "Whether to manage the bucket policy on existing_cur_bucket_name. Defaults to true when this module creates the CUR report, because AWS billing needs the policy to write, and false when cur_report_enabled is false. Set true or false to override that default. Managing the policy replaces the bucket policy. Statements in existing_cur_bucket_policy_json are kept, and Vantage statements override statements with the same Sid."
+  default     = null
 }
 
-variable "existing_cur_bucket_has_policy" {
-  type        = bool
-  description = "Whether existing_cur_bucket_name already has a bucket policy to merge with. Set to false for a bucket with no policy, because reading a missing bucket policy fails."
-  default     = true
+variable "existing_cur_bucket_policy_json" {
+  type        = string
+  description = "JSON policy document whose Statement array is merged into the managed bucket policy for existing_cur_bucket_name. Vantage statements override statements with the same Sid. Statements without a Sid are kept. Only used when the module manages the policy."
+  default     = null
+
+  validation {
+    condition = var.existing_cur_bucket_policy_json == null || (
+      can(jsondecode(var.existing_cur_bucket_policy_json).Statement) &&
+      (
+        try(length(jsondecode(var.existing_cur_bucket_policy_json).Statement), -1) == 0 ||
+        can(jsondecode(var.existing_cur_bucket_policy_json).Statement[0])
+      )
+    )
+    error_message = "existing_cur_bucket_policy_json must be a JSON policy document with a Statement array."
+  }
 }
 
 variable "existing_cur_bucket_manage_notification" {
   type        = bool
-  description = "Whether to manage the S3 event notification to Vantage on existing_cur_bucket_name. The notification configuration replaces any existing S3 event notifications on the bucket."
+  description = "Whether to manage the S3 event notification configuration on existing_cur_bucket_name. Defaults to true. S3 allows one notification configuration per bucket, so managing it replaces the bucket's notifications with the Vantage topic plus existing_cur_bucket_additional_notifications. Set to false to leave notifications unchanged."
   default     = true
+}
+
+variable "existing_cur_bucket_notification_eventbridge" {
+  type        = bool
+  description = "Whether the managed notification configuration on existing_cur_bucket_name keeps Amazon EventBridge enabled. When false, that configuration turns EventBridge off."
+  default     = false
+}
+
+variable "existing_cur_bucket_additional_notifications" {
+  type = object({
+    topics = optional(list(object({
+      id            = optional(string)
+      topic_arn     = string
+      events        = list(string)
+      filter_prefix = optional(string)
+      filter_suffix = optional(string)
+    })), [])
+    queues = optional(list(object({
+      id            = optional(string)
+      queue_arn     = string
+      events        = list(string)
+      filter_prefix = optional(string)
+      filter_suffix = optional(string)
+    })), [])
+    lambda_functions = optional(list(object({
+      id                  = optional(string)
+      lambda_function_arn = string
+      events              = list(string)
+      filter_prefix       = optional(string)
+      filter_suffix       = optional(string)
+    })), [])
+  })
+  description = "SNS, SQS, and Lambda notifications to keep on existing_cur_bucket_name alongside the Vantage topic. Ignored when existing_cur_bucket_manage_notification is false."
+  default     = {}
+}
+
+variable "existing_cur_bucket_kms_key_arn" {
+  type        = string
+  description = "KMS key ARN for an SSE-KMS existing CUR bucket. Grants the cross-account role kms:Decrypt on this key."
+  default     = null
+
+  validation {
+    condition     = var.existing_cur_bucket_kms_key_arn == null || can(regex("^arn:aws(-[a-z]+)?:kms:[a-z0-9-]+:\\d{12}:(key|alias)/.+$", var.existing_cur_bucket_kms_key_arn))
+    error_message = "existing_cur_bucket_kms_key_arn must be a KMS key or alias ARN."
+  }
 }
 
 variable "cur_bucket_region" {
@@ -82,8 +138,8 @@ variable "cur_bucket_lifecycle_days" {
 
 variable "enforce_https_only" {
   type        = bool
-  default     = true
-  description = "Deny plain-HTTP S3 requests from non-AWS-service principals on the CUR bucket."
+  default     = null
+  description = "Deny plain-HTTP S3 requests from non-AWS-service principals on the CUR bucket. Defaults to true when this module creates the bucket and false for an existing bucket, where the deny would apply to every client of the bucket. AWS billing report delivery is exempt via aws:PrincipalIsAWSService."
 }
 
 variable "cur_report_time_unit" {
@@ -101,6 +157,23 @@ variable "vantage_sns_topic_arn" {
   type        = string
   description = "Optional override for the Vantage SNS topic used to notify Vantage of CUR bucket events. This should only be changed for module development."
   default     = null
+}
+
+variable "cur_report_s3_prefix" {
+  type        = string
+  description = "S3 prefix for the managed CUR report. Defaults to <time unit>-v1, for example daily-v1. On an existing bucket, the Vantage notification filter and the cross-account role's s3:GetObject access are limited to this prefix. When cur_report_enabled is false and this is unset, both cover the whole bucket."
+  default     = null
+
+  validation {
+    condition = var.cur_report_s3_prefix == null || (
+      length(var.cur_report_s3_prefix) > 0 &&
+      length(var.cur_report_s3_prefix) <= 256 &&
+      can(regex("^[0-9A-Za-z!\\-_.*'()/]+$", var.cur_report_s3_prefix)) &&
+      !startswith(var.cur_report_s3_prefix, "/") &&
+      !endswith(var.cur_report_s3_prefix, "/")
+    )
+    error_message = "cur_report_s3_prefix must be 1-256 characters, contain only letters, numbers, and !-_.*'()/, and must not start or end with a slash."
+  }
 }
 
 variable "cur_report_name" {
