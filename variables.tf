@@ -75,7 +75,7 @@ variable "existing_cur_bucket_additional_notifications" {
 
 variable "existing_cur_bucket_kms_key_arn" {
   type        = string
-  description = "KMS key ARN for an SSE-KMS existing CUR bucket. Grants the cross-account role kms:Decrypt on this key."
+  description = "KMS key or alias ARN for an SSE-KMS existing CUR bucket. An alias ARN is resolved to the key ARN. Grants the cross-account role kms:Decrypt on the key."
   default     = null
 
   validation {

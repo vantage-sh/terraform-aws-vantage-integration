@@ -474,6 +474,13 @@ resource "aws_s3_bucket_notification" "existing_cur_bucket" {
   }
 }
 
+# IAM kms:Decrypt on an alias ARN does not allow calls that name the key.
+# Resolve either form to the key ARN.
+data "aws_kms_key" "existing_cur_bucket" {
+  count  = local.use_existing_cur_bucket && var.existing_cur_bucket_kms_key_arn != null ? 1 : 0
+  key_id = var.existing_cur_bucket_kms_key_arn
+}
+
 data "aws_iam_policy_document" "vantage_cur_retrieval" {
   count = local.cur_bucket_enabled ? 1 : 0
   statement {
@@ -490,14 +497,14 @@ data "aws_iam_policy_document" "vantage_cur_retrieval" {
   }
 
   dynamic "statement" {
-    for_each = local.use_existing_cur_bucket && var.existing_cur_bucket_kms_key_arn != null ? [var.existing_cur_bucket_kms_key_arn] : []
+    for_each = data.aws_kms_key.existing_cur_bucket
 
     content {
       effect = "Allow"
       actions = [
         "kms:Decrypt"
       ]
-      resources = [statement.value]
+      resources = [statement.value.arn]
     }
   }
 }

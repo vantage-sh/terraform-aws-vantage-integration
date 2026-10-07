@@ -20,6 +20,12 @@ mock_provider "aws" {
     }
   }
 
+  mock_data "aws_kms_key" {
+    defaults = {
+      arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-4123-8123-123456789012"
+    }
+  }
+
   mock_data "aws_s3_bucket" {
     defaults = {
       id                          = "existing-cur-bucket"
@@ -335,7 +341,7 @@ run "kms_decrypt" {
 
   variables {
     existing_cur_bucket_name        = "existing-cur-bucket"
-    existing_cur_bucket_kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+    existing_cur_bucket_kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-4123-8123-123456789012"
     upgrade_to_cur_2                = true
   }
 
@@ -349,8 +355,27 @@ run "kms_decrypt" {
       for statement in data.aws_iam_policy_document.vantage_cur_retrieval[0].statement : statement.actions
       ]), "kms:Decrypt") && contains(flatten([
       for statement in data.aws_iam_policy_document.vantage_cur_retrieval[0].statement : statement.resources
-    ]), "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000")
+    ]), "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-4123-8123-123456789012")
     error_message = "The role should be allowed to decrypt with the existing bucket's KMS key."
+  }
+}
+
+run "kms_alias_resolves_to_key" {
+  command = apply
+
+  variables {
+    existing_cur_bucket_name        = "existing-cur-bucket"
+    existing_cur_bucket_kms_key_arn = "arn:aws:kms:us-east-1:123456789012:alias/cur"
+    cur_report_enabled              = false
+  }
+
+  assert {
+    condition = contains(flatten([
+      for statement in data.aws_iam_policy_document.vantage_cur_retrieval[0].statement : statement.resources
+      ]), "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-4123-8123-123456789012") && !contains(flatten([
+      for statement in data.aws_iam_policy_document.vantage_cur_retrieval[0].statement : statement.resources
+    ]), "arn:aws:kms:us-east-1:123456789012:alias/cur")
+    error_message = "An alias ARN should be resolved to the KMS key ARN before it is granted."
   }
 }
 

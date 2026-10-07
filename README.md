@@ -138,7 +138,7 @@ By default the module manages the bucket policy only when it creates the CUR rep
 
 `enforce_https_only` defaults to `false` for an existing bucket, because the plain-HTTP deny would apply to every client of the bucket. Setting it to `true` requires the module to manage the policy.
 
-For an SSE-KMS bucket, set `existing_cur_bucket_kms_key_arn` so the Vantage role is allowed `kms:Decrypt` on that key.
+For an SSE-KMS bucket, set `existing_cur_bucket_kms_key_arn` to the key ARN or an alias ARN. An alias is resolved to the key, and the Vantage role is allowed `kms:Decrypt` on that key.
 
 #### S3 event notification
 
