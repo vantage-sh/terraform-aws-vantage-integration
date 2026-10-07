@@ -7,6 +7,16 @@ repos:
       - id: terraform_tflint
       - id: terraform_trivy
 
+  - repo: local
+    hooks:
+      - id: terraform_test
+        name: Terraform test
+        entry: bash -c 'terraform init -backend=false -input=false >/dev/null && terraform test'
+        language: system
+        pass_filenames: false
+        files: \.(tf|tftest\.hcl)$
+        require_serial: true
+
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
     rev: v9.26.0
     hooks:

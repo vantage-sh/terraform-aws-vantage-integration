@@ -1,5 +1,5 @@
 # Mocked-provider tests for CUR bucket behavior.
-# Requires Terraform 1.7 or newer. Not run in CI.
+# Requires Terraform 1.9 or newer (module required_version).
 
 mock_provider "aws" {
   mock_data "aws_caller_identity" {
