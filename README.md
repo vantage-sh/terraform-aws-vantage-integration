@@ -93,19 +93,18 @@ When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by def
 
 Use `existing_cur_bucket_name` instead of `cur_bucket_name` when the bucket already exists. The module looks the bucket up with a data source. It does not create or delete the bucket, and it does not change the bucket's lifecycle rules, ACL, or public access block. It manages the CUR report or CUR 2.0 export (unless `cur_report_enabled = false`), the cross-account role, the Vantage integration, and by default the bucket policy and S3 event notification.
 
-The bucket must be in `cur_bucket_region`, and the AWS provider must use that same region. The bucket lookup fails when the bucket is in a different region, whether or not the module manages the notification. Setting both `cur_bucket_name` and `existing_cur_bucket_name` fails at plan time.
+The bucket must be in `cur_bucket_region`, and the AWS provider must use that same region. Planning fails if the bucket is in a different region, or if both `cur_bucket_name` and `existing_cur_bucket_name` are set.
 
-```hcl
-module "vantage-integration" {
-  source = "vantage-sh/vantage-integration/aws"
+> **Before you apply:** the module can overwrite the bucket policy and the S3 event notification configuration. Neither is merged with what is on the bucket today. Check both first, and pass anything you want to keep as shown below:
+>
+> ```sh
+> aws s3api get-bucket-policy --bucket company-cur-bucket
+> aws s3api get-bucket-notification-configuration --bucket company-cur-bucket
+> ```
 
-  existing_cur_bucket_name = "company-cur-bucket"
-  cur_bucket_region        = "us-east-1"
-  upgrade_to_cur_2         = true
-}
-```
+Pick the case that matches your setup.
 
-`cur_report_s3_prefix` defaults to `<time unit>-v1` (for example `daily-v1`), which is the prefix this module has always used. On an existing bucket, the Vantage notification filter and the role's `s3:GetObject` access are limited to that prefix. Set `cur_report_enabled = false` when you already manage the report. If you do that and leave the prefix unset, the notification and `s3:GetObject` access cover the whole bucket.
+**You already have a CUR report or Data Export writing to the bucket.** Set `cur_report_enabled = false` and set `cur_report_s3_prefix` to the report's S3 prefix. The module leaves the bucket policy alone and limits Vantage's access and notification to that prefix. If you leave the prefix unset, Vantage reads and is notified for `.csv.gz` files across the whole bucket.
 
 ```hcl
 module "vantage-integration" {
@@ -114,24 +113,51 @@ module "vantage-integration" {
   existing_cur_bucket_name = "company-cur-bucket"
   cur_bucket_region        = "us-east-1"
   cur_report_enabled       = false
-  # Optional. Omit to cover the whole bucket.
-  cur_report_s3_prefix = "cur/vantage"
+  cur_report_s3_prefix     = "cur/vantage"
+}
+```
+
+**You want the module to create the report in your bucket.** The module creates the report at `cur_report_s3_prefix` (default `<time unit>-v1`, for example `daily-v1`) and replaces the bucket policy, because AWS billing needs a bucket policy to write. Pass any statements you want to keep.
+
+```hcl
+module "vantage-integration" {
+  source = "vantage-sh/vantage-integration/aws"
+
+  existing_cur_bucket_name = "company-cur-bucket"
+  cur_bucket_region        = "us-east-1"
+  upgrade_to_cur_2         = true
+
+  # Statements already on the bucket that should stay.
+  existing_cur_bucket_policy_json = data.aws_iam_policy_document.cur_bucket_extra.json
 }
 ```
 
 #### Bucket policy
 
-The module replaces the bucket policy, matching the existing-bucket CloudFormation template. It manages that policy by default only when it creates the CUR report, because AWS billing needs the policy to write report files. With `cur_report_enabled = false` the policy is left alone: the Vantage role is in the same account and reads reports through its IAM policy.
+By default the module manages the bucket policy only when it creates the CUR report. Set `existing_cur_bucket_manage_policy` to `true` or `false` to override that. When the module manages the policy, it replaces it with the Vantage statements plus `existing_cur_bucket_policy_json`. Vantage statements override kept statements with the same Sid. Statements without a Sid are kept as they are.
 
-Pass statements to keep in `existing_cur_bucket_policy_json`. They are merged into the managed policy, and Vantage statements override statements with the same Sid. Set `existing_cur_bucket_manage_policy` to `true` or `false` to override the default.
+`enforce_https_only` defaults to `false` for an existing bucket, because the plain-HTTP deny would apply to every client of the bucket. Setting it to `true` requires the module to manage the policy.
 
-`enforce_https_only` defaults to `false` for an existing bucket. The plain-HTTP deny applies to every client of the bucket. Set `enforce_https_only = true` to add it.
-
-For an SSE-KMS bucket, set `existing_cur_bucket_kms_key_arn` so the role is allowed `kms:Decrypt` on that key.
+For an SSE-KMS bucket, set `existing_cur_bucket_kms_key_arn` so the Vantage role is allowed `kms:Decrypt` on that key.
 
 #### S3 event notification
 
-S3 allows one notification configuration per bucket, so the module replaces it with the Vantage topic. Keep other destinations with `existing_cur_bucket_additional_notifications` (SNS topics, SQS queues, and Lambda functions). Set `existing_cur_bucket_notification_eventbridge = true` to keep EventBridge enabled. Otherwise the managed configuration turns EventBridge off. Set `existing_cur_bucket_manage_notification = false` to skip the notification entirely.
+S3 allows one notification configuration per bucket, so the module replaces it with the Vantage topic. To keep other destinations, list them in `existing_cur_bucket_additional_notifications`:
+
+```hcl
+  existing_cur_bucket_additional_notifications = {
+    queues = [{
+      queue_arn = "arn:aws:sqs:us-east-1:123456789012:cur-processor"
+      events    = ["s3:ObjectCreated:*"]
+    }]
+  }
+  # Keep EventBridge on if something already uses it. The default turns it off.
+  existing_cur_bucket_notification_eventbridge = true
+```
+
+Set `existing_cur_bucket_manage_notification = false` to leave notifications alone. Vantage then needs the bucket to notify its SNS topic, `arn:aws:sns:<cur_bucket_region>:630399649041:cost-and-usage-report-uploaded`, on `s3:ObjectCreated:*` for `.csv.gz` objects. Add that to your own notification configuration.
+
+Settings that only apply to a bucket this module creates, such as `cur_bucket_lifecycle_rules` and `compatibility_private_bucket_acl`, fail at plan time when combined with `existing_cur_bucket_name`. Notification extras without a managed notification fail the same way.
 
 #### Limits
 

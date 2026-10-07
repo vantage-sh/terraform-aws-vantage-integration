@@ -32,6 +32,28 @@ data "aws_caller_identity" "current" {
       )
       error_message = "existing_cur_bucket_policy_json is only applied when the module manages the policy on existing_cur_bucket_name. Set existing_cur_bucket_manage_policy to true."
     }
+
+    precondition {
+      condition = !(var.existing_cur_bucket_name != "" && var.enforce_https_only == true) || (
+        var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : var.cur_report_enabled
+      )
+      error_message = "enforce_https_only = true adds a statement to the bucket policy, but the module is not managing the policy on existing_cur_bucket_name. Set existing_cur_bucket_manage_policy to true."
+    }
+
+    precondition {
+      condition = (
+        !var.existing_cur_bucket_notification_eventbridge &&
+        length(coalesce(try(var.existing_cur_bucket_additional_notifications.topics, null), [])) == 0 &&
+        length(coalesce(try(var.existing_cur_bucket_additional_notifications.queues, null), [])) == 0 &&
+        length(coalesce(try(var.existing_cur_bucket_additional_notifications.lambda_functions, null), [])) == 0
+      ) || (var.existing_cur_bucket_name != "" && var.existing_cur_bucket_manage_notification)
+      error_message = "existing_cur_bucket_notification_eventbridge and existing_cur_bucket_additional_notifications only apply when the module manages the notification on existing_cur_bucket_name."
+    }
+
+    precondition {
+      condition     = var.existing_cur_bucket_name == "" || (var.cur_bucket_lifecycle_rules == null && !var.compatibility_private_bucket_acl)
+      error_message = "cur_bucket_lifecycle_rules and compatibility_private_bucket_acl only apply to a bucket this module creates. The module does not change lifecycle rules or the ACL on existing_cur_bucket_name."
+    }
   }
 }
 data "aws_partition" "current" {}

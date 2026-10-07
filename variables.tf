@@ -41,7 +41,7 @@ variable "existing_cur_bucket_manage_notification" {
 
 variable "existing_cur_bucket_notification_eventbridge" {
   type        = bool
-  description = "Whether the managed notification configuration on existing_cur_bucket_name keeps Amazon EventBridge enabled. When false, that configuration turns EventBridge off."
+  description = "Whether the managed notification configuration on existing_cur_bucket_name keeps Amazon EventBridge enabled. When false, that configuration turns EventBridge off. Requires existing_cur_bucket_manage_notification."
   default     = false
 }
 
@@ -69,7 +69,7 @@ variable "existing_cur_bucket_additional_notifications" {
       filter_suffix       = optional(string)
     })), [])
   })
-  description = "SNS, SQS, and Lambda notifications to keep on existing_cur_bucket_name alongside the Vantage topic. Ignored when existing_cur_bucket_manage_notification is false."
+  description = "SNS, SQS, and Lambda notifications to keep on existing_cur_bucket_name alongside the Vantage topic. Requires existing_cur_bucket_manage_notification."
   default     = {}
 }
 

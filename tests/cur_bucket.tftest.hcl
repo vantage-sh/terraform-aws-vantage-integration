@@ -401,6 +401,47 @@ run "both_bucket_variables" {
   ]
 }
 
+run "https_without_managed_policy" {
+  command = plan
+
+  variables {
+    existing_cur_bucket_name = "existing-cur-bucket"
+    cur_report_enabled       = false
+    enforce_https_only       = true
+  }
+
+  expect_failures = [
+    data.aws_caller_identity.current,
+  ]
+}
+
+run "notification_extras_without_managed_notification" {
+  command = plan
+
+  variables {
+    existing_cur_bucket_name                     = "existing-cur-bucket"
+    existing_cur_bucket_manage_notification      = false
+    existing_cur_bucket_notification_eventbridge = true
+  }
+
+  expect_failures = [
+    data.aws_caller_identity.current,
+  ]
+}
+
+run "created_bucket_settings_on_existing_bucket" {
+  command = plan
+
+  variables {
+    existing_cur_bucket_name   = "existing-cur-bucket"
+    cur_bucket_lifecycle_rules = []
+  }
+
+  expect_failures = [
+    data.aws_caller_identity.current,
+  ]
+}
+
 run "invalid_prefix" {
   command = plan
 
