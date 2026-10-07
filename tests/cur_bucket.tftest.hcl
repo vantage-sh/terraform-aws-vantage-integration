@@ -450,7 +450,7 @@ run "both_bucket_variables" {
   }
 
   expect_failures = [
-    data.aws_caller_identity.current,
+    var.existing_cur_bucket_name,
   ]
 }
 
@@ -464,7 +464,7 @@ run "https_without_managed_policy" {
   }
 
   expect_failures = [
-    data.aws_caller_identity.current,
+    var.enforce_https_only,
   ]
 }
 
@@ -478,7 +478,7 @@ run "notification_extras_without_managed_notification" {
   }
 
   expect_failures = [
-    data.aws_caller_identity.current,
+    var.existing_cur_bucket_notification_eventbridge,
   ]
 }
 
@@ -491,7 +491,7 @@ run "created_bucket_settings_on_existing_bucket" {
   }
 
   expect_failures = [
-    data.aws_caller_identity.current,
+    var.cur_bucket_lifecycle_rules,
   ]
 }
 
