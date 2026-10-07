@@ -35,10 +35,31 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6.3.0
+        uses: terraform-linters/setup-tflint@v6.3.2
 
       - name: Initialize TFLint
         run: tflint --init
 
       - name: Run TFLint
         run: tflint --format compact
+
+  terraform-test:
+    name: Terraform Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      # Tests use run.state_key (Terraform >= 1.11). The module itself still
+      # declares required_version >= 1.9.0 for consumers.
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: "1.11.0"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Test
+        run: terraform test

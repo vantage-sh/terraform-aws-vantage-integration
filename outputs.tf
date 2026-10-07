@@ -1,6 +1,6 @@
 output "vantage_cross_account_connection_role_arn" {
   description = "The Vantage cross account connection IAM role ARN"
-  value       = try(var.cur_bucket_name != "" ? aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn : aws_iam_role.vantage_cross_account_connection_without_bucket[0].arn, null)
+  value       = aws_iam_role.vantage_cross_account_connection.arn
 }
 
 output "vantage_cost_and_usage_report_arn" {
@@ -15,10 +15,10 @@ output "vantage_cost_and_usage_report_name" {
 
 output "vantage_cost_and_usage_reports_bucket_arn" {
   description = "The Vantage CUR bucket ARN"
-  value       = try(aws_s3_bucket.vantage_cost_and_usage_reports[0].arn, null)
+  value       = local.cur_bucket_arn
 }
 
 output "vantage_cost_and_usage_reports_bucket_id" {
   description = "The Vantage CUR bucket ID"
-  value       = try(aws_s3_bucket.vantage_cost_and_usage_reports[0].id, null)
+  value       = local.cur_bucket_id
 }
