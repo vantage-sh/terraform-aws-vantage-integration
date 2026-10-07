@@ -5,7 +5,11 @@ repos:
       - id: terraform_fmt
       - id: terraform_validate
       - id: terraform_tflint
+        exclude: ^tests/fixtures/
       - id: terraform_trivy
+        exclude: ^tests/fixtures/
+        args:
+          - --args=--skip-dirs=tests/fixtures
 
   - repo: local
     hooks:

@@ -8,35 +8,7 @@ This module handles linking an AWS account with your Vantage account. For manage
 
 ### Single cross-account role
 
-The module used to create one of two mutually exclusive IAM role addresses (`*_with_bucket` or `*_without_bucket`) and mirrored that split for several policies and the Vantage provider. Those are now single resources. Terraform cannot move both old addresses onto one new address, so the next plan shows **destroy then create** for the addresses below.
-
-The AWS IAM role name (`vantage_cross_account_connection`) and ARN stay the same. Expect a short recreate of that role, its inline policies, the `ViewOnlyAccess` attachment, and the `vantage_aws_provider` resource—not a new role name or a different ARN. Other resources that depend on the role (for example `aws_iam_role_policy.vantage_cur_retrieval[0]` when a CUR bucket is enabled) may also be replaced in the same apply even when their addresses did not rename.
-
-**CUR bucket path** (`cur_bucket_name` or `existing_cur_bucket_name` set):
-
-| Destroy | Create |
-| --- | --- |
-| `aws_iam_role.vantage_cross_account_connection_with_bucket[0]` | `aws_iam_role.vantage_cross_account_connection` |
-| `aws_iam_role_policy.vantage_root_with_bucket[0]` | `aws_iam_role_policy.vantage_root` |
-| `aws_iam_role_policy.vantage_cloudwatch_metrics_with_bucket[0]` | `aws_iam_role_policy.vantage_cloudwatch_metrics` |
-| `aws_iam_role_policy.vantage_additional_resources_with_bucket[0]` | `aws_iam_role_policy.vantage_additional_resources` |
-| `aws_iam_role_policy_attachment.vantage_cross_account_connection_with_bucket[0]` | `aws_iam_role_policy_attachment.vantage_cross_account_connection` |
-| `vantage_aws_provider.with_bucket[0]` | `vantage_aws_provider.this` |
-| `aws_iam_role_policy.vantage_autopilot_with_bucket[0]` (if `enable_autopilot`) | `aws_iam_role_policy.vantage_autopilot[0]` |
-| `aws_iam_role_policy.additional_inline_policies_with_bucket["<name>"]` (each entry) | `aws_iam_role_policy.additional_inline_policies["<name>"]` |
-
-**Member account path** (no CUR bucket):
-
-| Destroy | Create |
-| --- | --- |
-| `aws_iam_role.vantage_cross_account_connection_without_bucket[0]` | `aws_iam_role.vantage_cross_account_connection` |
-| `aws_iam_role_policy.vantage_root_without_bucket[0]` | `aws_iam_role_policy.vantage_root` |
-| `aws_iam_role_policy.vantage_cloudwatch_metrics_without_bucket[0]` | `aws_iam_role_policy.vantage_cloudwatch_metrics` |
-| `aws_iam_role_policy.vantage_additional_resources_without_bucket[0]` | `aws_iam_role_policy.vantage_additional_resources` |
-| `aws_iam_role_policy_attachment.vantage_cross_account_connection_without_bucket[0]` | `aws_iam_role_policy_attachment.vantage_cross_account_connection` |
-| `vantage_aws_provider.without_bucket[0]` | `vantage_aws_provider.this` |
-| `aws_iam_role_policy.vantage_autopilot_without_bucket[0]` (if `enable_autopilot`) | `aws_iam_role_policy.vantage_autopilot[0]` |
-| `aws_iam_role_policy.additional_inline_policies_without_bucket["<name>"]` (each entry) | `aws_iam_role_policy.additional_inline_policies["<name>"]` |
+Older module versions used separate `*_with_bucket` / `*_without_bucket` addresses for the cross-account IAM role, its policies, and the Vantage provider. Those are now single resources. State is renamed automatically on upgrade: the IAM role name (`vantage_cross_account_connection`) and ARN stay the same, and the plan should not destroy and recreate that role.
 
 ## Usage
 
