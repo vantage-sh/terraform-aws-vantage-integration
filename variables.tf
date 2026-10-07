@@ -214,7 +214,7 @@ variable "cur_report_s3_prefix" {
   default     = null
 
   validation {
-    condition = var.cur_report_s3_prefix == null || (
+    condition = var.cur_report_s3_prefix == null ? true : (
       length(var.cur_report_s3_prefix) > 0 &&
       length(var.cur_report_s3_prefix) <= 256 &&
       can(regex("^[0-9A-Za-z!\\-_.*'()/]+$", var.cur_report_s3_prefix)) &&
