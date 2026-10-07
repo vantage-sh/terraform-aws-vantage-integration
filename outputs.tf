@@ -1,6 +1,6 @@
 output "vantage_cross_account_connection_role_arn" {
   description = "The Vantage cross account connection IAM role ARN"
-  value       = try(local.cur_bucket_enabled ? aws_iam_role.vantage_cross_account_connection_with_bucket[0].arn : aws_iam_role.vantage_cross_account_connection_without_bucket[0].arn, null)
+  value       = aws_iam_role.vantage_cross_account_connection.arn
 }
 
 output "vantage_cost_and_usage_report_arn" {
