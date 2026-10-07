@@ -12,7 +12,7 @@ variable "existing_cur_bucket_name" {
 
 variable "existing_cur_bucket_manage_policy" {
   type        = bool
-  description = "Whether to manage the bucket policy on existing_cur_bucket_name. Defaults to true when this module creates the CUR report, because AWS billing needs the policy to write, and false when cur_report_enabled is false. Set true or false to override that default. Managing the policy replaces the bucket policy. Statements in existing_cur_bucket_policy_json are kept, and Vantage statements override statements with the same Sid."
+  description = "Whether to manage the bucket policy on existing_cur_bucket_name. Defaults to true when this module creates the CUR report (cur_report_enabled = true), because AWS billing needs the policy to write, and false otherwise. Set true or false to override that default. Managing the policy replaces the bucket policy. Statements in existing_cur_bucket_policy_json are kept, and Vantage statements override statements with the same Sid."
   default     = null
 }
 
@@ -69,7 +69,7 @@ variable "existing_cur_bucket_additional_notifications" {
       filter_suffix       = optional(string)
     })), [])
   })
-  description = "SNS, SQS, and Lambda notifications to keep on existing_cur_bucket_name alongside the Vantage topic. Requires existing_cur_bucket_manage_notification."
+  description = "SNS, SQS, and Lambda notifications to keep on existing_cur_bucket_name alongside the Vantage topic. Requires existing_cur_bucket_manage_notification. S3 rejects two rules for the same event when their prefix and suffix filters overlap, and a rule with no filter overlaps every rule for that event. The Vantage rule is s3:ObjectCreated:* for <prefix>*.csv.gz."
   default     = {}
 }
 
@@ -161,7 +161,7 @@ variable "vantage_sns_topic_arn" {
 
 variable "cur_report_s3_prefix" {
   type        = string
-  description = "S3 prefix for the managed CUR report. Defaults to <time unit>-v1, for example daily-v1. On an existing bucket, the Vantage notification filter and the cross-account role's s3:GetObject access are limited to this prefix. When cur_report_enabled is false and this is unset, both cover the whole bucket."
+  description = "S3 prefix for the managed CUR report. Defaults to <time unit>-v1, for example daily-v1. On an existing bucket, the Vantage notification filter and the cross-account role's s3:GetObject access are limited to this prefix. When the module does not create the report and this is unset, both cover the whole bucket."
   default     = null
 
   validation {
@@ -184,8 +184,8 @@ variable "cur_report_name" {
 
 variable "cur_report_enabled" {
   type        = bool
-  description = "Whether to create a CUR report. Set to false when managing the report separately."
-  default     = true
+  description = "Whether to create a CUR report. Defaults to true when this module creates the bucket and false for existing_cur_bucket_name, where a report usually already writes to the bucket. Set to false when managing the report separately."
+  default     = null
 }
 
 variable "upgrade_to_cur_2" {

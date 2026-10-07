@@ -124,11 +124,35 @@ run "created_bucket" {
   }
 }
 
+run "existing_bucket_defaults_to_no_report" {
+  command = apply
+
+  variables {
+    existing_cur_bucket_name = "existing-cur-bucket"
+  }
+
+  assert {
+    condition     = length(aws_cur_report_definition.vantage_cost_and_usage_reports) == 0 && length(aws_bcmdataexports_export.vantage_cost_and_usage_reports) == 0
+    error_message = "An existing bucket should not get a CUR report unless cur_report_enabled is set."
+  }
+
+  assert {
+    condition     = length(aws_s3_bucket_policy.existing_cur_bucket) == 0 && length(aws_s3_bucket_notification.existing_cur_bucket) == 1
+    error_message = "Without a module-created report, the policy is left alone and the Vantage notification is still managed."
+  }
+
+  assert {
+    condition     = vantage_aws_provider.with_bucket[0].bucket_arn == "arn:aws:s3:::existing-cur-bucket" && vantage_aws_provider.with_bucket[0].cross_account_arn == "arn:aws:iam::123456789012:role/vantage_cross_account_connection"
+    error_message = "The Vantage integration should be registered with the existing bucket ARN and the cross-account role."
+  }
+}
+
 run "existing_bucket_with_report" {
   command = apply
 
   variables {
     existing_cur_bucket_name = "existing-cur-bucket"
+    cur_report_enabled       = true
   }
 
   assert {
@@ -253,6 +277,7 @@ run "keep_policy_statements" {
 
   variables {
     existing_cur_bucket_name = "existing-cur-bucket"
+    cur_report_enabled       = true
     existing_cur_bucket_policy_json = jsonencode({
       Version = "2012-10-17"
       Statement = [
@@ -312,6 +337,7 @@ run "notifications_and_eventbridge" {
       lambda_functions = [{
         lambda_function_arn = "arn:aws:lambda:us-east-1:123456789012:function:other"
         events              = ["s3:ObjectCreated:*"]
+        filter_suffix       = ".parquet"
       }]
     }
   }
@@ -342,6 +368,7 @@ run "kms_decrypt" {
   variables {
     existing_cur_bucket_name        = "existing-cur-bucket"
     existing_cur_bucket_kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-4123-8123-123456789012"
+    cur_report_enabled              = true
     upgrade_to_cur_2                = true
   }
 
@@ -384,6 +411,7 @@ run "opt_out_policy_and_notification" {
 
   variables {
     existing_cur_bucket_name                = "existing-cur-bucket"
+    cur_report_enabled                      = true
     existing_cur_bucket_manage_policy       = false
     existing_cur_bucket_manage_notification = false
   }
@@ -464,6 +492,24 @@ run "created_bucket_settings_on_existing_bucket" {
 
   expect_failures = [
     data.aws_caller_identity.current,
+  ]
+}
+
+run "overlapping_notification" {
+  command = plan
+
+  variables {
+    existing_cur_bucket_name = "existing-cur-bucket"
+    existing_cur_bucket_additional_notifications = {
+      queues = [{
+        queue_arn = "arn:aws:sqs:us-east-1:123456789012:other"
+        events    = ["s3:ObjectCreated:*"]
+      }]
+    }
+  }
+
+  expect_failures = [
+    aws_s3_bucket_notification.existing_cur_bucket,
   ]
 }
 

@@ -91,7 +91,7 @@ When `cur_bucket_name` is set, the bucket policy denies plain-HTTP access by def
 
 ### Existing S3 bucket
 
-Use `existing_cur_bucket_name` instead of `cur_bucket_name` when the bucket already exists. The module looks the bucket up with a data source. It does not create or delete the bucket, and it does not change the bucket's lifecycle rules, ACL, or public access block. It manages the CUR report or CUR 2.0 export (unless `cur_report_enabled = false`), the cross-account role, the Vantage integration, and by default the bucket policy and S3 event notification.
+Use `existing_cur_bucket_name` instead of `cur_bucket_name` when the bucket already exists. The module looks the bucket up with a data source. It does not create or delete the bucket, and it does not change the bucket's lifecycle rules, ACL, or public access block. It assumes a CUR report or Data Export already writes to the bucket, so it does not create one unless you set `cur_report_enabled = true`. It manages the cross-account role, the Vantage integration, and by default the S3 event notification.
 
 The bucket must be in `cur_bucket_region`, and the AWS provider must use that same region. Planning fails if the bucket is in a different region, or if both `cur_bucket_name` and `existing_cur_bucket_name` are set.
 
@@ -104,7 +104,7 @@ The bucket must be in `cur_bucket_region`, and the AWS provider must use that sa
 
 Pick the case that matches your setup.
 
-**You already have a CUR report or Data Export writing to the bucket.** Set `cur_report_enabled = false` and set `cur_report_s3_prefix` to the report's S3 prefix. The module leaves the bucket policy alone and limits Vantage's access and notification to that prefix. If you leave the prefix unset, Vantage reads and is notified for `.csv.gz` files across the whole bucket.
+**You already have a CUR report or Data Export writing to the bucket (the default).** Set `cur_report_s3_prefix` to the report's S3 prefix. The module leaves the report and the bucket policy alone and limits Vantage's access and notification to that prefix. If you leave the prefix unset, Vantage reads and is notified for `.csv.gz` files across the whole bucket.
 
 ```hcl
 module "vantage-integration" {
@@ -112,12 +112,11 @@ module "vantage-integration" {
 
   existing_cur_bucket_name = "company-cur-bucket"
   cur_bucket_region        = "us-east-1"
-  cur_report_enabled       = false
   cur_report_s3_prefix     = "cur/vantage"
 }
 ```
 
-**You want the module to create the report in your bucket.** The module creates the report at `cur_report_s3_prefix` (default `<time unit>-v1`, for example `daily-v1`) and replaces the bucket policy, because AWS billing needs a bucket policy to write. Pass any statements you want to keep.
+**You want the module to create the report in your bucket.** Set `cur_report_enabled = true`. The module creates the report at `cur_report_s3_prefix` (default `<time unit>-v1`, for example `daily-v1`) and replaces the bucket policy, because AWS billing needs a bucket policy to write. Pass any statements you want to keep.
 
 ```hcl
 module "vantage-integration" {
@@ -125,6 +124,7 @@ module "vantage-integration" {
 
   existing_cur_bucket_name = "company-cur-bucket"
   cur_bucket_region        = "us-east-1"
+  cur_report_enabled       = true
   upgrade_to_cur_2         = true
 
   # Statements already on the bucket that should stay.
@@ -147,15 +147,18 @@ S3 allows one notification configuration per bucket, so the module replaces it w
 ```hcl
   existing_cur_bucket_additional_notifications = {
     queues = [{
-      queue_arn = "arn:aws:sqs:us-east-1:123456789012:cur-processor"
-      events    = ["s3:ObjectCreated:*"]
+      queue_arn     = "arn:aws:sqs:us-east-1:123456789012:cur-processor"
+      events        = ["s3:ObjectCreated:*"]
+      filter_suffix = ".json"
     }]
   }
   # Keep EventBridge on if something already uses it. The default turns it off.
   existing_cur_bucket_notification_eventbridge = true
 ```
 
-Set `existing_cur_bucket_manage_notification = false` to leave notifications alone. Vantage then needs the bucket to notify its SNS topic, `arn:aws:sns:<cur_bucket_region>:630399649041:cost-and-usage-report-uploaded`, on `s3:ObjectCreated:*` for `.csv.gz` objects. Add that to your own notification configuration.
+S3 rejects the configuration when two rules for the same event have overlapping prefixes and suffixes. A rule with no filter overlaps every rule for that event. The Vantage rule is `s3:ObjectCreated:*` for `<prefix>*.csv.gz`, so another `ObjectCreated` rule needs a different suffix (`.json` does not overlap `.csv.gz`) or a prefix that does not overlap. Planning fails when the rules you pass in overlap.
+
+Set `existing_cur_bucket_manage_notification = false` to leave notifications alone. Vantage then needs the bucket to notify its SNS topic, `arn:aws:sns:<cur_bucket_region>:630399649041:cost-and-usage-report-uploaded`, on `s3:ObjectCreated:*` for `.csv.gz` objects. Add that to your own notification configuration. The same overlap rule applies there: a catch-all `ObjectCreated` rule already on the bucket has to be narrowed before the Vantage rule can sit beside it.
 
 Settings that only apply to a bucket this module creates, such as `cur_bucket_lifecycle_rules` and `compatibility_private_bucket_acl`, fail at plan time when combined with `existing_cur_bucket_name`. Notification extras without a managed notification fail the same way.
 

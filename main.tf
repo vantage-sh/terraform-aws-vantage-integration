@@ -27,7 +27,7 @@ data "aws_caller_identity" "current" {
     precondition {
       condition = var.existing_cur_bucket_policy_json == null || (
         var.existing_cur_bucket_name != "" && (
-          var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : var.cur_report_enabled
+          var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : local.cur_report_enabled
         )
       )
       error_message = "existing_cur_bucket_policy_json is only applied when the module manages the policy on existing_cur_bucket_name. Set existing_cur_bucket_manage_policy to true."
@@ -35,7 +35,7 @@ data "aws_caller_identity" "current" {
 
     precondition {
       condition = !(var.existing_cur_bucket_name != "" && var.enforce_https_only == true) || (
-        var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : var.cur_report_enabled
+        var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : local.cur_report_enabled
       )
       error_message = "enforce_https_only = true adds a statement to the bucket policy, but the module is not managing the policy on existing_cur_bucket_name. Set existing_cur_bucket_manage_policy to true."
     }
@@ -79,10 +79,14 @@ locals {
   use_existing_cur_bucket = var.existing_cur_bucket_name != ""
   cur_bucket_enabled      = local.create_cur_bucket || local.use_existing_cur_bucket
 
+  # Null means: create the report for a bucket this module creates. An existing bucket
+  # usually already has a report writing to it, so the caller opts in.
+  cur_report_enabled = var.cur_report_enabled != null ? var.cur_report_enabled : local.create_cur_bucket
+
   # Null means: manage the policy when this module creates the report, because AWS
   # billing needs a bucket policy to write. A self-managed report leaves the policy alone.
   manage_existing_cur_bucket_policy = local.use_existing_cur_bucket && (
-    var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : var.cur_report_enabled
+    var.existing_cur_bucket_manage_policy != null ? var.existing_cur_bucket_manage_policy : local.cur_report_enabled
   )
   manage_existing_cur_bucket_notification = local.use_existing_cur_bucket && var.existing_cur_bucket_manage_notification
 
@@ -94,12 +98,12 @@ locals {
   # bucket only when this module creates the report. A forced policy on a self-managed
   # report matches the existing-bucket CloudFormation template: the cross-account read
   # statement only.
-  include_cur_billing_policy_statements = local.create_cur_bucket || (local.use_existing_cur_bucket && var.cur_report_enabled)
+  include_cur_billing_policy_statements = local.create_cur_bucket || (local.use_existing_cur_bucket && local.cur_report_enabled)
 
   cur_report_s3_prefix = var.cur_report_s3_prefix != null ? var.cur_report_s3_prefix : "${lower(var.cur_report_time_unit)}-v1"
   # Unset prefix on a self-managed report covers the whole existing bucket.
   existing_cur_object_prefix = var.cur_report_s3_prefix != null ? var.cur_report_s3_prefix : (
-    var.cur_report_enabled ? local.cur_report_s3_prefix : ""
+    local.cur_report_enabled ? local.cur_report_s3_prefix : ""
   )
 
   cur_bucket_id = local.create_cur_bucket ? aws_s3_bucket.vantage_cost_and_usage_reports[0].id : (
@@ -115,6 +119,53 @@ locals {
   additional_cur_notification_topics  = coalesce(try(var.existing_cur_bucket_additional_notifications.topics, null), [])
   additional_cur_notification_queues  = coalesce(try(var.existing_cur_bucket_additional_notifications.queues, null), [])
   additional_cur_notification_lambdas = coalesce(try(var.existing_cur_bucket_additional_notifications.lambda_functions, null), [])
+
+  # S3 rejects two rules for the same event when their prefixes overlap and their
+  # suffixes overlap. An empty filter overlaps every filter.
+  cur_notification_rules = concat(
+    [{
+      events = ["s3:ObjectCreated:*"]
+      prefix = local.existing_cur_object_prefix != "" ? "${local.existing_cur_object_prefix}/" : ""
+      suffix = ".csv.gz"
+    }],
+    [for rule in local.additional_cur_notification_topics : {
+      events = rule.events
+      prefix = rule.filter_prefix == null ? "" : rule.filter_prefix
+      suffix = rule.filter_suffix == null ? "" : rule.filter_suffix
+    }],
+    [for rule in local.additional_cur_notification_queues : {
+      events = rule.events
+      prefix = rule.filter_prefix == null ? "" : rule.filter_prefix
+      suffix = rule.filter_suffix == null ? "" : rule.filter_suffix
+    }],
+    [for rule in local.additional_cur_notification_lambdas : {
+      events = rule.events
+      prefix = rule.filter_prefix == null ? "" : rule.filter_prefix
+      suffix = rule.filter_suffix == null ? "" : rule.filter_suffix
+    }],
+  )
+  overlapping_cur_notification_rules = [
+    for pair in setproduct(range(length(local.cur_notification_rules)), range(length(local.cur_notification_rules))) : pair
+    if pair[0] < pair[1] && anytrue([
+      for left_event in local.cur_notification_rules[pair[0]].events : anytrue([
+        for right_event in local.cur_notification_rules[pair[1]].events : (
+          left_event == right_event ||
+          (endswith(left_event, ":*") && startswith(right_event, trimsuffix(left_event, "*"))) ||
+          (endswith(right_event, ":*") && startswith(left_event, trimsuffix(right_event, "*")))
+          ) && (
+          local.cur_notification_rules[pair[0]].prefix == "" ||
+          local.cur_notification_rules[pair[1]].prefix == "" ||
+          startswith(local.cur_notification_rules[pair[0]].prefix, local.cur_notification_rules[pair[1]].prefix) ||
+          startswith(local.cur_notification_rules[pair[1]].prefix, local.cur_notification_rules[pair[0]].prefix)
+          ) && (
+          local.cur_notification_rules[pair[0]].suffix == "" ||
+          local.cur_notification_rules[pair[1]].suffix == "" ||
+          endswith(local.cur_notification_rules[pair[0]].suffix, local.cur_notification_rules[pair[1]].suffix) ||
+          endswith(local.cur_notification_rules[pair[1]].suffix, local.cur_notification_rules[pair[0]].suffix)
+        )
+      ])
+    ])
+  ]
 
   vantage_sns_topic_arns = {
     ap-southeast-1 = "arn:aws:sns:ap-southeast-1:630399649041:cost-and-usage-report-uploaded"
@@ -280,7 +331,7 @@ resource "aws_iam_role_policy_attachment" "vantage_cross_account_connection_with
 }
 
 resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
-  count                      = local.cur_bucket_enabled && var.cur_report_enabled && !var.upgrade_to_cur_2 ? 1 : 0
+  count                      = local.cur_bucket_enabled && local.cur_report_enabled && !var.upgrade_to_cur_2 ? 1 : 0
   report_name                = var.cur_report_name
   time_unit                  = var.cur_report_time_unit
   format                     = "textORcsv"
@@ -299,7 +350,7 @@ resource "aws_cur_report_definition" "vantage_cost_and_usage_reports" {
 }
 
 resource "aws_bcmdataexports_export" "vantage_cost_and_usage_reports" {
-  count = local.cur_bucket_enabled && var.cur_report_enabled && var.upgrade_to_cur_2 ? 1 : 0
+  count = local.cur_bucket_enabled && local.cur_report_enabled && var.upgrade_to_cur_2 ? 1 : 0
 
   export {
     name = var.cur_report_name
@@ -470,6 +521,13 @@ resource "aws_s3_bucket_notification" "existing_cur_bucket" {
       events              = lambda_function.value.events
       filter_prefix       = lambda_function.value.filter_prefix
       filter_suffix       = lambda_function.value.filter_suffix
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = length(local.overlapping_cur_notification_rules) == 0
+      error_message = "S3 rejects this notification configuration because two rules for the same event have overlapping prefix and suffix filters. The Vantage rule is s3:ObjectCreated:* for ${local.existing_cur_object_prefix != "" ? "${local.existing_cur_object_prefix}/" : ""}*.csv.gz. A rule with no filter overlaps every rule for that event. Give each additional notification a prefix or suffix that does not overlap, or use a different event."
     }
   }
 }
