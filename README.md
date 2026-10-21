@@ -24,7 +24,13 @@ Vantage supports CUR buckets in the following regions:
 - `us-east-1`
 - `us-west-2`
 
-The below examples assume you'll use the [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) feature of the AWS provider to access the desired AWS account.
+### About the `assume_role` block
+
+The examples below use the AWS provider's [assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#assuming-an-iam-role) block. It tells Terraform how to log in to your AWS account so it can create this module's resources. The `role_arn` value is a placeholder for a deploy role in your own AWS account. It is not a Vantage role, and Vantage does not provide it.
+
+You do not need to supply any Vantage role ARN. The module gets the Vantage role ARN and external ID from the Vantage API through the `vantage_aws_provider_info` data source. The role that Vantage assumes is `vantage_cross_account_connection`, which the module creates in the account Terraform is logged in to.
+
+If you are already authenticated to the target AWS account (for example, with an SSO profile, `AWS_PROFILE`, or access keys), delete the `assume_role` block. Whichever identity you use must be able to create IAM roles and role policies. For a management account with `cur_bucket_name` or `existing_cur_bucket_name`, it must also be able to manage the S3 bucket, bucket policy and notification, and the CUR report or Data Export.
 
 ### Management AWS Account with CUR 2.0 Integration
 
@@ -33,6 +39,10 @@ This example creates a management AWS account integration with a CUR 2.0 data ex
 ```hcl
 provider "aws" {
   region = "us-east-1"
+  # Optional: tells Terraform how to log in to YOUR AWS account to create the
+  # resources in this module. This is your own deploy role, not a role Vantage
+  # provides or assumes. Remove this block if you are already authenticated to
+  # the target account (SSO profile, AWS_PROFILE, or access keys).
   assume_role {
     role_arn = "arn:aws:iam::123456789012:role/admin-role"
   }
@@ -180,6 +190,10 @@ This is an example for creating a member AWS account integration. A cross accoun
 ```hcl
 provider "aws" {
   region = "us-east-1"
+  # Optional: tells Terraform how to log in to YOUR AWS account to create the
+  # resources in this module. This is your own deploy role, not a role Vantage
+  # provides or assumes. Remove this block if you are already authenticated to
+  # the target account (SSO profile, AWS_PROFILE, or access keys).
   assume_role {
     role_arn = "arn:aws:iam::123456789012:role/admin-role"
   }
